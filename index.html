@@ -408,9 +408,14 @@
             rawContent.forEach(row => {
                 const platform = getColValue(row, 'Platform');
                 const profileName = getColValue(row, 'Profile name');
-                const contentId = getColValue(row, 'Content ID');
+                let contentId = getColValue(row, 'Content ID');
                 
                 if (!contentId || !platform) return;
+
+                // Normalizzazione per LinkedIn e altri canali: rimuove prefissi URN se presenti
+                if (platform.toLowerCase().includes('linkedin') && contentId.includes(':')) {
+                    contentId = contentId.split(':').pop();
+                }
 
                 const canaleCompleto = profileName ? `${platform} ${profileName}` : platform;
 
@@ -449,7 +454,13 @@
 
             // 2. Elabora Commenti
             rawCommunity.forEach(row => {
-                const parentId = getColValue(row, 'Parent ID').toLowerCase();
+                let parentId = getColValue(row, 'Parent ID').toLowerCase();
+                
+                // Normalizzazione LinkedIn anche per i commenti per allineare le chiavi di unione
+                if (parentId.includes(':') && (parentId.includes('linkedin') || parentId.includes('urn:li:'))) {
+                    const cleanId = parentId.split(':').pop();
+                    parentId = `linkedin-${cleanId}`;
+                }
                 
                 let message = getColValue(row, 'Message Content');
                 if (!message) message = getColValue(row, 'Care case ID');
