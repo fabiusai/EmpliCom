@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Media Data Aggregator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <style>
+        /* Variabili Colori e Design */
+        :root {
+            --brand-yellow: #eddc01;
+            --brand-blue: #0146bc;
+            --bg-color: #f5f5f7;
+            --card-bg: #ffffff;
+            --text-main: #1d1d1f;
+            --text-muted: #86868b;
+            --border-color: #d2d2d7;
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        /* Reset Base */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.5;
+            padding: 2rem 1rem;
+        }
+
+        h1, h2, h3, h4 { color: var(--brand-blue); font-weight: 600; }
+
+        .container { max-width: 1000px; margin: 0 auto; }
+
+        header { text-align: center; margin-bottom: 3rem; }
+        header p { color: var(--text-muted); margin-top: 0.5rem; }
+
+        /* Card Sezioni */
+        .section-card {
+            background-color: var(--card-bg);
+            border-radius: var(--radius);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+        }
+
+        .section-title {
+            margin-bottom: 1.5rem;
+            font-size: 1.25rem;
+            border-bottom: 2px solid var(--bg-color);
+            padding-bottom: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .accordion-header {
+            cursor: pointer;
+            user-select: none;
+            transition: opacity 0.2s;
+        }
+        
+        .accordion-header:hover {
+            opacity: 0.8;
+        }
+
+        /* Form e Input */
+        .form-group { margin-bottom: 1.5rem; }
+        .form-group label {
+            display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--brand-blue);
+        }
+
+        input[type="file"], input[type="text"] {
+            display: block; width: 100%; padding: 0.75rem; border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm); background-color: var(--bg-color);
+        }
+        
+        input[type="file"] { cursor: pointer; }
+
+        /* Grid Filtri */
+        .filters-grid {
+            display: grid; grid-template-columns: 1fr 2fr 1fr; /* Più spazio alla colonna argomenti */
+            gap: 1.5rem; margin-bottom: 1.5rem; align-items: start;
+        }
+
+        select {
+            width: 100%; padding: 0.75rem; border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm); background-color: var(--card-bg);
+            color: var(--text-main); font-size: 1rem; cursor: pointer;
+        }
+        
+        select[multiple] {
+            height: 180px; /* Più spazio in altezza per la lista multipla */
+        }
+        
+        select:focus, input[type="text"]:focus { outline: none; border-color: var(--brand-blue); }
+
+        /* Bottoni */
+        button {
+            background-color: var(--brand-yellow); color: var(--brand-blue); border: none;
+            padding: 1rem 2rem; font-size: 1rem; font-weight: 600; border-radius: var(--radius-sm);
+            cursor: pointer; transition: all 0.2s ease; width: 100%; display: inline-block;
+        }
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        button:active { background-color: #d1c200; transform: translateY(0); }
+        button.btn-secondary { background-color: var(--brand-blue); color: var(--card-bg); }
+        button.btn-secondary:active { background-color: #013794; }
+        button.btn-small { padding: 0.5rem 1rem; width: auto; font-size: 0.9rem; margin-top: 1rem; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Statistiche */
+        .stats {
+            display: flex; gap: 2rem; margin-bottom: 1.5rem; background-color: var(--bg-color);
+            padding: 1rem 1.5rem; border-radius: var(--radius-sm);
+        }
+        .stat-item { display: flex; flex-direction: column; }
+        .stat-value { font-size: 1.5rem; font-weight: bold; color: var(--brand-blue); }
+        .stat-label { font-size: 0.85rem; color: var(--text-muted); }
+
+        /* Playground UI */
+        .playground-container {
+            display: flex; flex-direction: column; gap: 1.5rem; margin-top: 1.5rem;
+            max-height: 800px; overflow-y: auto; padding-right: 10px;
+        }
+        
+        /* Stile scrollbar per playground */
+        .playground-container::-webkit-scrollbar { width: 8px; }
+        .playground-container::-webkit-scrollbar-track { background: var(--bg-color); border-radius: 4px; }
+        .playground-container::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+
+        .post-card {
+            border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+            padding: 1.5rem; background-color: var(--card-bg);
+        }
+        .post-header {
+            display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;
+        }
+        .post-platform {
+            background-color: var(--brand-blue); color: white; padding: 0.25rem 0.75rem;
+            border-radius: 20px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+        }
+        .post-date { font-size: 0.85rem; color: var(--text-muted); }
+        .post-meta { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; }
+        .post-meta span { background: var(--bg-color); padding: 0.2rem 0.5rem; border-radius: 4px; margin-right: 0.5rem; }
+        .post-content { font-size: 1rem; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--bg-color); }
+        
+        /* Stile Commenti */
+        .comments-list { display: flex; flex-direction: column; gap: 1rem; }
+        .comment-item {
+            background-color: var(--bg-color); padding: 1rem; border-radius: var(--radius-sm);
+            border-left: 4px solid var(--border-color);
+        }
+        .comment-item.positivo { border-left-color: #34c759; }
+        .comment-item.negativo { border-left-color: #ff3b30; }
+        .comment-item.neutro { border-left-color: #8e8e93; }
+        
+        .comment-header { display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; }
+        .comment-date { color: var(--text-muted); }
+        .comment-sentiment { font-weight: 600; text-transform: uppercase; font-size: 0.7rem; }
+        .sentiment-text-positivo { color: #34c759; }
+        .sentiment-text-negativo { color: #ff3b30; }
+        .sentiment-text-neutro { color: #8e8e93; }
+        .comment-body { font-size: 0.95rem; }
+
+        .hidden { display: none !important; }
+
+        @media (max-width: 768px) {
+            .filters-grid { grid-template-columns: 1fr; }
+            .stats { flex-direction: column; gap: 1rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Gestore Commenti Social</h1>
+        <p>Aggrega, filtra ed esplora i tuoi dati social prima dell'analisi LLM.</p>
+    </header>
+
+    <div class="section-card" id="upload-section">
+        <h2 class="section-title">1. Importazione Dati</h2>
+        <div class="form-group">
+            <label for="file-content">File Post (Content)</label>
+            <input type="file" id="file-content" accept=".csv, .xls, .xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
+        </div>
+        <div class="form-group">
+            <label for="file-community">File Commenti (Community Feed)</label>
+            <input type="file" id="file-community" accept=".csv, .xls, .xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
+        </div>
+        <button id="btn-process">Elabora Dati</button>
+    </div>
+
+    <div class="section-card hidden" id="workspace-section">
+        <h2 class="section-title accordion-header" onclick="document.getElementById('filters-body').classList.toggle('hidden')">
+            <span>2. Filtraggio ed Esportazione</span>
+            <span style="font-size: 0.8em; font-weight: normal;">(Clicca per espandere/collassare) 🔽</span>
+        </h2>
+        
+        <div id="filters-body">
+            <div class="stats">
+                <div class="stat-item">
+                    <span class="stat-value" id="stat-posts">0</span>
+                    <span class="stat-label">Post Trovati</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="stat-comments">0</span>
+                    <span class="stat-label">Commenti Associati</span>
+                </div>
+            </div>
+
+            <div class="filters-grid">
+                <div class="form-group">
+                    <label for="filter-platform">Canale Social e Pagina</label>
+                    <select id="filter-platform">
+                        <option value="all">Tutti i canali</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="filter-topic">Argomento</label>
+                    <input type="text" id="search-topic" placeholder="Cerca un argomento..." style="margin-bottom: 0.5rem;">
+                    <select id="filter-topic" multiple>
+                        <option value="all">Tutti gli argomenti</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="filter-label">Label</label>
+                    <select id="filter-label" multiple>
+                        <option value="all">Tutte le label</option>
+                    </select>
+                </div>
+            </div>
+
+            <button id="btn-export" class="btn-secondary">Esporta in JSON</button>
+        </div>
+    </div>
+
+    <div class="section-card hidden" id="playground-section">
+        <h2 class="section-title">3. Playground Visuale</h2>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+            Anteprima dei post e dei commenti.
+        </p>
+        
+        <div id="dynamic-sort-ui" style="display: flex; gap: 10px; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center;">
+            <strong style="color: var(--brand-blue);">Ordina i post:</strong>
+            <button class="btn-secondary btn-small" style="margin:0;" onclick="currentSortOrder='date-asc'; sortFilteredData(); renderPlayground();">Meno recenti</button>
+            <button class="btn-secondary btn-small" style="margin:0;" onclick="currentSortOrder='date-desc'; sortFilteredData(); renderPlayground();">Più recenti</button>
+            <button class="btn-secondary btn-small" style="margin:0;" onclick="currentSortOrder='comments-asc'; sortFilteredData(); renderPlayground();">Meno commenti</button>
+            <button class="btn-secondary btn-small" style="margin:0;" onclick="currentSortOrder='comments-desc'; sortFilteredData(); renderPlayground();">Più commenti</button>
+        </div>
+
+        <div class="playground-container" id="playground-container">
+            </div>
+    </div>
+</div>
+
+<script>
+    const LABEL_MAP = {
+        '#ISR': 'Investor e stakeholder relations',
+        '#PES': 'Prodotti e servizi',
+        '#TER': 'Territorio',
+        '#FIL': 'Filatelia',
+        '#CET': 'CSR e trasparenza',
+        '#DEI': 'Digital e Innovazione',
+        '#EB': 'Employer branding',
+        '#NED': 'News editoriali',
+        '#RIC': 'Ricorrenze',
+        '#ST': 'Storici',
+        '#MICO': 'Milano Cortina',
+        '#NAT': 'Campagna Natale'
+    };
+
+    const SENTIMENT_MAP = {
+        'positive': 'positivo',
+        'negative': 'negativo',
+        'neutral': 'neutro'
+    };
+
+    let aggregatedData = [];
+    let filteredData = [];
+    let currentSortOrder = 'date-asc'; // Ordinamento di default
+
+    // Utility per estrarre valori dalle colonne ignorando differenze di maiuscole/spazi
+    function getColValue(row, colName) {
+        const target = colName.trim().toLowerCase();
+        const foundKey = Object.keys(row).find(key => key.trim().toLowerCase() === target);
+        return foundKey ? (row[foundKey] || '').toString().trim() : '';
+    }
+
+    // Utility per parsing
+    function parseFile(file) {
+        return new Promise((resolve, reject) => {
+            const fileName = file.name.toLowerCase();
+            if (fileName.endsWith('.csv')) {
+                Papa.parse(file, {
+                    header: true, skipEmptyLines: true,
+                    complete: (results) => resolve(results.data),
+                    error: (error) => reject(error)
+                });
+            } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                        resolve(json);
+                    } catch (error) { reject(new Error("Errore Excel: " + error.message)); }
+                };
+                reader.onerror = (error) => reject(error);
+                reader.readAsArrayBuffer(file);
+            } else { reject(new Error("Formato file non supportato.")); }
+        });
+    }
+
+    // Utility per bottoni
+    function withButtonState(buttonId, loadingText, successText, action) {
+        const btn = document.getElementById(buttonId);
+        const originalText = btn.innerText;
+        btn.innerText = loadingText;
+        btn.disabled = true;
+        setTimeout(async () => {
+            try {
+                await action();
+                btn.innerText = successText;
+            } catch (error) {
+                console.error(error);
+                btn.innerText = "Errore: " + error.message;
+            } finally {
+                setTimeout(() => { btn.innerText = originalText; btn.disabled = false; }, 2000);
+            }
+        }, 100); 
+    }
+
+    // Utility per formattare la data riconoscendo formato corretto ita ed Excel serial number
+    function parseCustomDate(dateString) {
+        if (!dateString) return new Date(0);
+        const str = String(dateString).trim();
+        
+        // 1. Controllo se arriva il seriale numerico "nascosto" di Excel (es: 45657.42755)
+        if (!isNaN(str) && str.indexOf('/') === -1 && str.indexOf('-') === -1) {
+            const excelSerial = parseFloat(str);
+            // Range di sicurezza per riconoscere le date Excel (tra 1927 e 2091)
+            if (excelSerial > 10000 && excelSerial < 70000) {
+                // Calcola l'epoca convertendo da Excel (30 Dic 1899) a JS
+                const dateUTC = new Date(Math.round((excelSerial - 25569) * 86400000));
+                return new Date(
+                    dateUTC.getUTCFullYear(),
+                    dateUTC.getUTCMonth(),
+                    dateUTC.getUTCDate(),
+                    dateUTC.getUTCHours(),
+                    dateUTC.getUTCMinutes(),
+                    dateUTC.getUTCSeconds()
+                );
+            }
+        }
+
+        // 2. Intercetta stringhe con formato italiano: DD/MM/YYYY o DD/MM/YY + eventuali ore
+        const parts = str.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+        if (parts) {
+            let year = parseInt(parts[3], 10);
+            if (year < 100) year += 2000; // gestisce in automatico l'anno a 2 cifre
+            
+            return new Date(
+                year,
+                parseInt(parts[2], 10) - 1,             // Mese (JS usa indice 0-11)
+                parseInt(parts[1], 10),                 // Giorno
+                parts[4] ? parseInt(parts[4], 10) : 0,  // Ore
+                parts[5] ? parseInt(parts[5], 10) : 0,  // Minuti
+                parts[6] ? parseInt(parts[6], 10) : 0   // Secondi
+            );
+        }
+        
+        // 3. Fallback al parser standard di sistema
+        let d = new Date(dateString);
+        return isNaN(d.getTime()) ? new Date(0) : d;
+    }
+
+    function formatDate(dateObj) {
+        if (!dateObj || isNaN(dateObj.getTime()) || dateObj.getTime() === 0) return "Data non disponibile";
+        return dateObj.toLocaleString('it-IT', { 
+            day: '2-digit', month: '2-digit', year: 'numeric', 
+            hour: '2-digit', minute: '2-digit' 
+        });
+    }
+
+    // Processamento Principale
+    document.getElementById('btn-process').addEventListener('click', () => {
+        const fileContent = document.getElementById('file-content').files[0];
+        const fileCommunity = document.getElementById('file-community').files[0];
+
+        if (!fileContent || !fileCommunity) {
+            alert("Seleziona entrambi i file."); return;
+        }
+
+        withButtonState('btn-process', 'Elaborazione in corso...', 'Fatto!', async () => {
+            const rawContent = await parseFile(fileContent);
+            const rawCommunity = await parseFile(fileCommunity);
+            const postsMap = new Map();
+            
+            // 1. Elabora Post
+            rawContent.forEach(row => {
+                const platform = getColValue(row, 'Platform');
+                const profileName = getColValue(row, 'Profile name');
+                const contentId = getColValue(row, 'Content ID');
+                
+                if (!contentId || !platform) return;
+
+                const canaleCompleto = profileName ? `${platform} ${profileName}` : platform;
+
+                const rawLabels = getColValue(row, 'Labels').split(/[;,]/).map(s => s.trim());
+                let topicList = [], mappedLabelsList = [];
+
+                rawLabels.forEach(tag => {
+                    if (tag.startsWith('#')) {
+                        const upperTag = tag.toUpperCase();
+                        if (LABEL_MAP[upperTag]) mappedLabelsList.push(LABEL_MAP[upperTag]);
+                    } else if (tag.length > 0) {
+                        topicList.push(tag);
+                    }
+                });
+
+                const topic = topicList.join(', ');
+                let textContent = getColValue(row, 'Content');
+                if (!textContent) textContent = topic;
+                
+                const rawDate = getColValue(row, 'Date') || getColValue(row, 'Created time');
+                const dateObj = parseCustomDate(rawDate);
+
+                const matchKey = `${platform.toLowerCase()}-${contentId.toLowerCase()}`;
+                postsMap.set(matchKey, {
+                    DataOggetto: dateObj,
+                    DataFormattata: formatDate(dateObj),
+                    Canale: canaleCompleto,
+                    CanaleBase: platform,
+                    Contenuto: textContent,
+                    Argomento: topic,
+                    Label: mappedLabelsList.join(', '),
+                    Link: getColValue(row, 'View on platform'),
+                    Commenti: []
+                });
+            });
+
+            // 2. Elabora Commenti
+            rawCommunity.forEach(row => {
+                const parentId = getColValue(row, 'Parent ID').toLowerCase();
+                
+                let message = getColValue(row, 'Message Content');
+                if (!message) message = getColValue(row, 'Care case ID');
+                if (!message) message = '[Testo rimosso/vuoto]';
+
+                // Skip di messaggi rimossi
+                if (message === '[Testo rimosso/vuoto]' || message.toLowerCase().includes('rimosso') || message.trim() === '') {
+                    return; 
+                }
+
+                const rawSentiment = getColValue(row, 'Sentiment').toLowerCase();
+                const createdTimeRaw = getColValue(row, 'Created time');
+                const dateObj = parseCustomDate(createdTimeRaw);
+
+                if (parentId && postsMap.has(parentId)) {
+                    postsMap.get(parentId).Commenti.push({
+                        DataOggetto: dateObj,
+                        DataFormattata: formatDate(dateObj),
+                        Testo: message,
+                        Sentiment: SENTIMENT_MAP[rawSentiment] || 'neutro'
+                    });
+                }
+            });
+
+            // Filtra solo post che hanno commenti
+            aggregatedData = Array.from(postsMap.values()).filter(p => p.Commenti.length > 0);
+            
+            // Ordina i commenti per data
+            aggregatedData.forEach(post => {
+                post.Commenti.sort((a, b) => a.DataOggetto - b.DataOggetto);
+            });
+
+            filteredData = [...aggregatedData];
+
+            updateWorkspace();
+            applyFilters();
+            
+            document.getElementById('workspace-section').classList.remove('hidden');
+            document.getElementById('playground-section').classList.remove('hidden');
+        });
+    });
+
+    // Motore ricerca argomenti
+    document.getElementById('search-topic').addEventListener('input', (e) => {
+        const term = e.target.value.toLowerCase();
+        const options = document.getElementById('filter-topic').options;
+        for (let i = 0; i < options.length; i++) {
+            if (options[i].text.toLowerCase().includes(term) || options[i].value === 'all') {
+                options[i].style.display = '';
+            } else {
+                options[i].style.display = 'none';
+            }
+        }
+    });
+
+    // Filtri UI
+    function updateWorkspace() {
+        const platforms = new Set(), topics = new Set(), labels = new Set();
+        aggregatedData.forEach(post => {
+            if (post.Canale) platforms.add(post.Canale);
+            if (post.Argomento) post.Argomento.split(',').forEach(t => { if(t.trim()) topics.add(t.trim()) });
+            if (post.Label) post.Label.split(',').forEach(l => { if(l.trim()) labels.add(l.trim()) });
+        });
+
+        populateSelect('filter-platform', platforms, false);
+        populateSelect('filter-topic', topics, true);
+        populateSelect('filter-label', labels, true);
+    }
+
+    function populateSelect(elementId, dataSet, multiple) {
+        const select = document.getElementById(elementId);
+        select.innerHTML = multiple ? '' : '<option value="all">Tutti i canali</option>';
+        if (!multiple && select.id !== 'filter-platform') {
+            select.innerHTML = '<option value="all">Tutte le opzioni</option>';
+        }
+        
+        Array.from(dataSet).sort().forEach(item => {
+            const option = document.createElement('option');
+            option.value = item; option.textContent = item;
+            select.appendChild(option);
+        });
+    }
+
+    function applyFilters() {
+        const platformFilter = document.getElementById('filter-platform').value;
+        const selectedTopics = Array.from(document.getElementById('filter-topic').selectedOptions).map(o => o.value).filter(v => v !== 'all');
+        const selectedLabels = Array.from(document.getElementById('filter-label').selectedOptions).map(o => o.value).filter(v => v !== 'all');
+
+        filteredData = aggregatedData.filter(post => {
+            const matchPlatform = platformFilter === 'all' || post.Canale === platformFilter;
+            const matchTopic = selectedTopics.length === 0 || selectedTopics.some(t => post.Argomento.includes(t));
+            const matchLabel = selectedLabels.length === 0 || selectedLabels.some(l => post.Label.includes(l));
+            return matchPlatform && matchTopic && matchLabel;
+        });
+
+        let filteredComments = 0;
+        filteredData.forEach(post => filteredComments += post.Commenti.length);
+        
+        document.getElementById('stat-posts').innerText = filteredData.length;
+        document.getElementById('stat-comments').innerText = filteredComments;
+
+        renderPlayground();
+    }
+
+    document.getElementById('filter-platform').addEventListener('change', applyFilters);
+    document.getElementById('filter-topic').addEventListener('change', applyFilters);
+    document.getElementById('filter-label').addEventListener('change', applyFilters);
+
+    function sortFilteredData() {
+        if (currentSortOrder === 'date-asc') {
+            filteredData.sort((a, b) => a.DataOggetto - b.DataOggetto);
+        } else if (currentSortOrder === 'date-desc') {
+            filteredData.sort((a, b) => b.DataOggetto - a.DataOggetto);
+        } else if (currentSortOrder === 'comments-asc') {
+            filteredData.sort((a, b) => a.Commenti.length - b.Commenti.length);
+        } else if (currentSortOrder === 'comments-desc') {
+            filteredData.sort((a, b) => b.Commenti.length - a.Commenti.length);
+        }
+    }
+
+    // Formattazione Copy Avanzata
+    function formatCopyTextAdvanced(text) {
+        if (!text) return text;
+        
+        const urls = [];
+        // 1. Estrai e metti al sicuro i link (rendendoli anche blu)
+        let formatted = text.replace(/(https?:\/\/[^\s]+|www\.[^\s]+)/gi, (match) => {
+            const href = match.startsWith('http') ? match : 'http://' + match;
+            urls.push(`<a href="${href}" target="_blank" style="color: var(--brand-blue); font-weight: 500; text-decoration: none;">${match}</a>`);
+            return `__URL_${urls.length - 1}__`;
+        });
+
+        // 2. Estrai e metti al sicuro gli hashtag (rendendoli blu)
+        const tags = [];
+        formatted = formatted.replace(/(#[a-zA-Z0-9_]+)/g, (match) => {
+            tags.push(`<span style="color: var(--brand-blue); font-weight: 500;">${match}</span>`);
+            return `__TAG_${tags.length - 1}__`;
+        });
+
+        // 3. Applica l'a capo se un punto è attaccato a una lettera o a una emoji (non spezza gli URL o i tag perché sono stati sostituiti!)
+        formatted = formatted.replace(/\.([a-zA-Z]|\p{Emoji_Presentation}|\p{Extended_Pictographic})/gu, '.<br><br>$1');
+
+        // 4. Ripristina Hashtag e URL
+        tags.forEach((t, i) => formatted = formatted.replace(`__TAG_${i}__`, t));
+        urls.forEach((u, i) => formatted = formatted.replace(`__URL_${i}__`, u));
+
+        return formatted;
+    }
+
+    function renderPlayground() {
+        const container = document.getElementById('playground-container');
+        container.innerHTML = '';
+
+        if (filteredData.length === 0) {
+            container.innerHTML = '<p style="color: var(--text-muted);">Nessun dato corrispondente ai filtri selezionati.</p>';
+            return;
+        }
+
+        // Applica l'ordinamento richiesto
+        sortFilteredData();
+
+        // Genera la lista piatta
+        filteredData.forEach((post, idx) => {
+            const total = post.Commenti.length;
+            const sent = post.Commenti.reduce((acc, c) => {
+                acc[c.Sentiment] = (acc[c.Sentiment] || 0) + 1;
+                return acc;
+            }, {});
+
+            const perc = (val) => total > 0 ? Math.round((val || 0) / total * 100) : 0;
+            const accordionId = `acc-post-${idx}`;
+
+            const card = document.createElement('div');
+            card.className = 'post-card';
+            card.innerHTML = `
+                <div class="post-header">
+                    <span class="post-platform">${post.Canale}</span>
+                    <span class="post-date">${post.DataFormattata}</span>
+                </div>
+                <div class="post-meta" style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center;">
+                    <div><strong>Label:</strong> ${post.Label || 'N/D'}</div>
+                    <div><strong>Argomento:</strong> ${post.Argomento || 'N/D'}</div>
+                    <div><strong>Link:</strong> <a href="${post.Link}" target="_blank" style="color: var(--brand-blue); font-weight: 500; text-decoration: none;">Apri Post</a></div>
+                    <div style="background: #eee; padding: 8px; border-radius: 4px; font-size: 0.85rem; display: flex; gap: 10px; flex-wrap: wrap;">
+                        <strong>Commenti (${total}):</strong> 
+                        <span style="color: #34c759; font-weight: bold;">Positivi: ${perc(sent.positivo)}%</span> | 
+                        <span style="color: #8e8e93; font-weight: bold;">Neutri: ${perc(sent.neutro)}%</span> | 
+                        <span style="color: #ff3b30; font-weight: bold;">Negativi: ${perc(sent.negativo)}%</span>
+                    </div>
+                </div>
+                <div class="post-content" style="white-space: pre-wrap; word-break: break-word;">${formatCopyTextAdvanced(post.Contenuto)}</div>
+                <button class="btn-secondary btn-small" onclick="document.getElementById('${accordionId}').classList.toggle('hidden')">
+                    Mostra / Nascondi Commenti
+                </button>
+                <div id="${accordionId}" class="comments-section hidden">
+                    <div class="comments-list" style="margin-top:1.5rem;">
+                        ${post.Commenti.map(c => `
+                            <div class="comment-item ${c.Sentiment}">
+                                <div class="comment-header">
+                                    <span class="comment-date">${c.DataFormattata}</span>
+                                    <span class="comment-sentiment sentiment-text-${c.Sentiment}">${c.Sentiment}</span>
+                                </div>
+                                <div class="comment-body">${c.Testo}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    // Export in JSON base (mantenuto per eventuale integrazione successiva)
+    document.getElementById('btn-export').addEventListener('click', () => {
+        if (filteredData.length === 0) {
+            alert("Nessun dato da esportare."); return;
+        }
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(filteredData, null, 2));
+        const dlAnchorElem = document.createElement('a');
+        dlAnchorElem.setAttribute("href", dataStr);
+        dlAnchorElem.setAttribute("download", "dati_social_filtrati.json");
+        dlAnchorElem.click();
+    });
+</script>
+
+</body>
+</html>
