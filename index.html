@@ -3,304 +3,427 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Social Media Data Aggregator</title>
+    <title>Social Media Data Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
     <style>
-        /* Variabili Colori e Design */
+        /* Variabili Design System */
         :root {
             --brand-yellow: #eddc01;
             --brand-blue: #0146bc;
-            --bg-color: #f5f5f7;
-            --card-bg: #ffffff;
-            --text-main: #1d1d1f;
-            --text-muted: #86868b;
-            --border-color: #d2d2d7;
-            --radius: 12px;
-            --radius-sm: 8px;
+            --brand-blue-hover: #013794;
+            --bg-body: #f4f5f7;
+            --bg-panel: #ffffff;
+            --text-main: #111827;
+            --text-muted: #6b7280;
+            --border-color: #e5e7eb;
+            --pos-color: #10b981; /* Verde */
+            --neu-color: #9ca3af; /* Grigio */
+            --neg-color: #ef4444; /* Rosso */
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-drawer: -4px 0 15px rgba(0,0,0,0.1);
         }
 
-        /* Reset Base */
+        /* Reset e Base */
         * { box-sizing: border-box; margin: 0; padding: 0; }
-
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
+            background-color: var(--bg-body);
             color: var(--text-main);
-            line-height: 1.5;
-            padding: 2rem 1rem;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* Gestiamo lo scroll internamente */
         }
 
-        h1, h2, h3, h4 { color: var(--brand-blue); font-weight: 600; }
+        h1, h2, h3 { color: var(--brand-blue); font-weight: 600; }
+        button { cursor: pointer; border: none; font-family: inherit; transition: all 0.2s; }
 
-        .container { max-width: 1000px; margin: 0 auto; }
-
-        header { text-align: center; margin-bottom: 3rem; }
-        header p { color: var(--text-muted); margin-top: 0.5rem; }
-
-        /* Card Sezioni */
-        .section-card {
-            background-color: var(--card-bg);
-            border-radius: var(--radius);
-            padding: 2rem;
-            margin-bottom: 2rem;
-            border: 1px solid var(--border-color);
-            box-shadow: 0 2px 10px rgba(0,0,0,0.02);
-        }
-
-        .section-title {
-            margin-bottom: 1.5rem;
-            font-size: 1.25rem;
-            border-bottom: 2px solid var(--bg-color);
-            padding-bottom: 0.75rem;
+        /* Top Bar */
+        .topbar {
+            background-color: var(--bg-panel);
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            z-index: 10;
         }
+        .topbar-right { display: flex; gap: 1rem; align-items: center; }
+        .stat-badge {
+            background: var(--bg-body); padding: 0.5rem 1rem;
+            border-radius: 20px; font-weight: 500; font-size: 0.9rem;
+            border: 1px solid var(--border-color);
+        }
+        .stat-badge span { color: var(--brand-blue); font-weight: bold; margin-left: 0.5rem; }
+        
+        .btn-export {
+            background-color: var(--brand-blue); color: white;
+            padding: 0.5rem 1rem; border-radius: var(--radius-md); font-weight: 500;
+        }
+        .btn-export:hover { background-color: var(--brand-blue-hover); }
 
-        .accordion-header {
-            cursor: pointer;
-            user-select: none;
-            transition: opacity 0.2s;
+        /* Area Caricamento Unificata */
+        #upload-overlay {
+            position: absolute; top: 60px; left: 0; right: 0; bottom: 0;
+            background-color: var(--bg-body); z-index: 20;
+            display: flex; justify-content: center; align-items: center; padding: 2rem;
+        }
+        .dropzone {
+            background: var(--bg-panel); border: 2px dashed var(--brand-blue);
+            border-radius: var(--radius-lg); padding: 4rem 2rem;
+            text-align: center; max-width: 600px; width: 100%;
+            box-shadow: var(--shadow-md); transition: background 0.2s;
+        }
+        .dropzone.dragover { background: #eef2ff; }
+        .dropzone-icon { font-size: 3rem; margin-bottom: 1rem; }
+        .dropzone-btn {
+            background-color: var(--brand-yellow); color: var(--brand-blue);
+            padding: 0.75rem 2rem; border-radius: var(--radius-md);
+            font-weight: 600; font-size: 1.1rem; margin-top: 1.5rem; display: inline-block;
+        }
+        .dropzone-btn:hover { filter: brightness(0.95); transform: translateY(-1px); }
+
+        /* Layout Dashboard Principale */
+        .dashboard-layout {
+            display: flex; flex: 1; overflow: hidden;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        .dashboard-layout.active { opacity: 1; pointer-events: all; }
+
+        /* Sidebar Filtri */
+        .sidebar {
+            width: 300px; background: var(--bg-panel); border-right: 1px solid var(--border-color);
+            display: flex; flex-direction: column; overflow-y: auto;
+        }
+        .sidebar-header {
+            padding: 1.5rem; border-bottom: 1px solid var(--border-color);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .btn-reset {
+            background: #fee2e2; color: #b91c1c; padding: 0.4rem 0.8rem;
+            border-radius: var(--radius-md); font-size: 0.8rem; font-weight: 600;
+        }
+        .btn-reset:hover { background: #fecaca; }
+
+        .filter-section { padding: 1.5rem; border-bottom: 1px solid var(--border-color); }
+        .filter-title { font-size: 0.9rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 1rem; }
+        
+        .search-input {
+            width: 100%; padding: 0.6rem; border: 1px solid var(--border-color);
+            border-radius: var(--radius-md); margin-bottom: 1rem; font-size: 0.9rem;
         }
         
-        .accordion-header:hover {
-            opacity: 0.8;
+        .checkbox-list {
+            max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;
         }
-
-        /* Form e Input */
-        .form-group { margin-bottom: 1.5rem; }
-        .form-group label {
-            display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--brand-blue);
-        }
-
-        input[type="file"], input[type="text"] {
-            display: block; width: 100%; padding: 0.75rem; border: 1px solid var(--border-color);
-            border-radius: var(--radius-sm); background-color: var(--bg-color);
-        }
+        /* Scrollbar custom */
+        .checkbox-list::-webkit-scrollbar { width: 6px; }
+        .checkbox-list::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
         
-        input[type="file"] { cursor: pointer; }
+        .checkbox-item { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; }
+        .checkbox-item input { margin-top: 0.2rem; cursor: pointer; }
 
-        /* Grid Filtri */
-        .filters-grid {
-            display: grid; grid-template-columns: 1fr 2fr 1fr; /* Più spazio alla colonna argomenti */
-            gap: 1.5rem; margin-bottom: 1.5rem; align-items: start;
+        /* Area Tabella (Master) */
+        .main-content {
+            flex: 1; overflow-y: auto; padding: 1.5rem; background-color: var(--bg-body);
         }
-
-        select {
-            width: 100%; padding: 0.75rem; border: 1px solid var(--border-color);
-            border-radius: var(--radius-sm); background-color: var(--card-bg);
-            color: var(--text-main); font-size: 1rem; cursor: pointer;
+        .table-container {
+            background: var(--bg-panel); border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm); border: 1px solid var(--border-color);
+            overflow: hidden;
         }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th { background-color: #f9fafb; padding: 1rem; font-weight: 600; color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; border-bottom: 1px solid var(--border-color); }
+        td { padding: 1rem; border-bottom: 1px solid var(--border-color); font-size: 0.95rem; vertical-align: middle; }
+        tr:hover { background-color: #f8fafc; cursor: pointer; }
+        tr.selected { background-color: #eff6ff; }
         
-        select[multiple] {
-            height: 180px; /* Più spazio in altezza per la lista multipla */
+        .channel-tag {
+            background: var(--brand-blue); color: white; padding: 0.2rem 0.6rem;
+            border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
         }
+
+        /* Barra Sentiment Lineare */
+        .sentiment-bar-container { width: 100px; height: 8px; background: var(--border-color); border-radius: 4px; display: flex; overflow: hidden; margin-top: 4px; }
+        .s-pos { background: var(--pos-color); }
+        .s-neu { background: var(--neu-color); }
+        .s-neg { background: var(--neg-color); }
+
+        /* Pannello Dettaglio (Detail / Drawer) */
+        .detail-drawer {
+            position: fixed; top: 60px; right: -600px; width: 500px; bottom: 0;
+            background: var(--bg-panel); box-shadow: var(--shadow-drawer);
+            transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 30;
+            display: flex; flex-direction: column;
+        }
+        .detail-drawer.open { right: 0; }
         
-        select:focus, input[type="text"]:focus { outline: none; border-color: var(--brand-blue); }
-
-        /* Bottoni */
-        button {
-            background-color: var(--brand-yellow); color: var(--brand-blue); border: none;
-            padding: 1rem 2rem; font-size: 1rem; font-weight: 600; border-radius: var(--radius-sm);
-            cursor: pointer; transition: all 0.2s ease; width: 100%; display: inline-block;
+        .drawer-header {
+            padding: 1.5rem; border-bottom: 1px solid var(--border-color);
+            display: flex; justify-content: space-between; align-items: flex-start;
+            background: #f8fafc;
         }
-        button:hover { opacity: 0.9; transform: translateY(-1px); }
-        button:active { background-color: #d1c200; transform: translateY(0); }
-        button.btn-secondary { background-color: var(--brand-blue); color: var(--card-bg); }
-        button.btn-secondary:active { background-color: #013794; }
-        button.btn-small { padding: 0.5rem 1rem; width: auto; font-size: 0.9rem; margin-top: 1rem; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        /* Statistiche */
-        .stats {
-            display: flex; gap: 2rem; margin-bottom: 1.5rem; background-color: var(--bg-color);
-            padding: 1rem 1.5rem; border-radius: var(--radius-sm);
+        .btn-close {
+            background: transparent; font-size: 1.5rem; color: var(--text-muted);
+            line-height: 1; padding: 0.2rem 0.5rem; border-radius: 4px;
         }
-        .stat-item { display: flex; flex-direction: column; }
-        .stat-value { font-size: 1.5rem; font-weight: bold; color: var(--brand-blue); }
-        .stat-label { font-size: 0.85rem; color: var(--text-muted); }
-
-        /* Playground UI */
-        .playground-container {
-            display: flex; flex-direction: column; gap: 1.5rem; margin-top: 1.5rem;
-            max-height: 800px; overflow-y: auto; padding-right: 10px;
-        }
+        .btn-close:hover { background: var(--border-color); color: var(--text-main); }
         
-        /* Stile scrollbar per playground */
-        .playground-container::-webkit-scrollbar { width: 8px; }
-        .playground-container::-webkit-scrollbar-track { background: var(--bg-color); border-radius: 4px; }
-        .playground-container::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
-
-        .post-card {
-            border: 1px solid var(--border-color); border-radius: var(--radius-sm);
-            padding: 1.5rem; background-color: var(--card-bg);
-        }
-        .post-header {
-            display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;
-        }
-        .post-platform {
-            background-color: var(--brand-blue); color: white; padding: 0.25rem 0.75rem;
-            border-radius: 20px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
-        }
-        .post-date { font-size: 0.85rem; color: var(--text-muted); }
-        .post-meta { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; }
-        .post-meta span { background: var(--bg-color); padding: 0.2rem 0.5rem; border-radius: 4px; margin-right: 0.5rem; }
-        .post-content { font-size: 1rem; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--bg-color); }
+        .drawer-body { flex: 1; overflow-y: auto; padding: 1.5rem; }
         
-        /* Stile Commenti */
+        .detail-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; font-size: 0.85rem; }
+        .meta-box { background: var(--bg-body); padding: 0.75rem; border-radius: var(--radius-md); }
+        .meta-label { color: var(--text-muted); margin-bottom: 0.2rem; font-size: 0.75rem; text-transform: uppercase; }
+        .meta-value { font-weight: 600; }
+        
+        .detail-content { font-size: 1rem; line-height: 1.6; margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); white-space: pre-wrap; word-break: break-word; }
+        
+        /* Commenti nel pannello */
         .comments-list { display: flex; flex-direction: column; gap: 1rem; }
-        .comment-item {
-            background-color: var(--bg-color); padding: 1rem; border-radius: var(--radius-sm);
-            border-left: 4px solid var(--border-color);
-        }
-        .comment-item.positivo { border-left-color: #34c759; }
-        .comment-item.negativo { border-left-color: #ff3b30; }
-        .comment-item.neutro { border-left-color: #8e8e93; }
+        .comment-item { padding: 1rem; border-radius: var(--radius-md); background: var(--bg-body); border-left: 4px solid var(--border-color); }
+        .comment-item.positivo { border-left-color: var(--pos-color); }
+        .comment-item.negativo { border-left-color: var(--neg-color); }
+        .comment-item.neutro { border-left-color: var(--neu-color); }
         
         .comment-header { display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; }
         .comment-date { color: var(--text-muted); }
-        .comment-sentiment { font-weight: 600; text-transform: uppercase; font-size: 0.7rem; }
-        .sentiment-text-positivo { color: #34c759; }
-        .sentiment-text-negativo { color: #ff3b30; }
-        .sentiment-text-neutro { color: #8e8e93; }
-        .comment-body { font-size: 0.95rem; }
+        .comment-sentiment { font-weight: 700; text-transform: uppercase; font-size: 0.7rem; }
+        .s-text-positivo { color: var(--pos-color); }
+        .s-text-negativo { color: var(--neg-color); }
+        .s-text-neutro { color: var(--neu-color); }
 
-        .hidden { display: none !important; }
+        /* Overlay scuro per chiudere cliccando fuori */
+        .drawer-overlay {
+            position: fixed; top: 60px; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.3); z-index: 25; opacity: 0; pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .drawer-overlay.active { opacity: 1; pointer-events: all; }
 
+        @media (max-width: 1024px) {
+            .detail-drawer { width: 400px; }
+        }
         @media (max-width: 768px) {
-            .filters-grid { grid-template-columns: 1fr; }
-            .stats { flex-direction: column; gap: 1rem; }
+            .dashboard-layout { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; max-height: 50vh; border-right: none; border-bottom: 1px solid var(--border-color); }
+            .detail-drawer { width: 100%; right: -100%; }
         }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <header>
-        <h1>Gestore Commenti Social</h1>
-        <p>Aggrega, filtra ed esplora i tuoi dati social prima dell'analisi LLM.</p>
+    <header class="topbar">
+        <h1>Social Data Dashboard</h1>
+        <div class="topbar-right">
+            <div class="stat-badge" id="badge-posts" style="display: none;">Post: <span id="stat-posts">0</span></div>
+            <div class="stat-badge" id="badge-comments" style="display: none;">Commenti: <span id="stat-comments">0</span></div>
+            <button class="btn-export" id="btn-export" style="display: none;">Esporta JSON</button>
+        </div>
     </header>
 
-    <div class="section-card" id="upload-section">
-        <h2 class="section-title">1. Importazione Dati</h2>
-        <div class="form-group">
-            <label for="file-content">File Post (Content)</label>
-            <input type="file" id="file-content" accept=".csv, .xls, .xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
+    <div id="upload-overlay">
+        <div class="dropzone" id="dropzone">
+            <div class="dropzone-icon">📥</div>
+            <h2>Carica i dati dei social</h2>
+            <p style="color: var(--text-muted); margin-top: 0.5rem;">Seleziona o trascina qui contemporaneamente<br>sia il file dei Post che quello dei Commenti.</p>
+            <input type="file" id="file-input" multiple accept=".csv, .xls, .xlsx" style="display: none;">
+            <button class="dropzone-btn" onclick="document.getElementById('file-input').click()">Scegli i file (2)</button>
+            <p id="upload-status" style="margin-top: 1rem; font-weight: bold; color: var(--brand-blue);"></p>
         </div>
-        <div class="form-group">
-            <label for="file-community">File Commenti (Community Feed)</label>
-            <input type="file" id="file-community" accept=".csv, .xls, .xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
-        </div>
-        <button id="btn-process">Elabora Dati</button>
     </div>
 
-    <div class="section-card hidden" id="workspace-section">
-        <h2 class="section-title accordion-header" onclick="document.getElementById('filters-body').classList.toggle('hidden')">
-            <span>2. Filtraggio ed Esportazione</span>
-            <span style="font-size: 0.8em; font-weight: normal;">(Clicca per espandere/collassare) 🔽</span>
-        </h2>
+    <div class="dashboard-layout" id="dashboard-layout">
         
-        <div id="filters-body">
-            <div class="stats">
-                <div class="stat-item">
-                    <span class="stat-value" id="stat-posts">0</span>
-                    <span class="stat-label">Post Trovati</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-value" id="stat-comments">0</span>
-                    <span class="stat-label">Commenti Associati</span>
-                </div>
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h3>Filtra Dati</h3>
+                <button class="btn-reset" onclick="resetFilters()">Azzera Filtri</button>
+            </div>
+            
+            <div class="filter-section">
+                <div class="filter-title">Ordina per</div>
+                <select id="sort-order" class="search-input" onchange="applyFilters()">
+                    <option value="date-desc">Più recenti</option>
+                    <option value="date-asc">Meno recenti</option>
+                    <option value="comments-desc">Più commentati</option>
+                    <option value="comments-asc">Meno commentati</option>
+                </select>
             </div>
 
-            <div class="filters-grid">
-                <div class="form-group">
-                    <label for="filter-platform">Canale Social e Pagina</label>
-                    <select id="filter-platform">
-                        <option value="all">Tutti i canali</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="filter-topic">Argomento</label>
-                    <input type="text" id="search-topic" placeholder="Cerca un argomento..." style="margin-bottom: 0.5rem;">
-                    <select id="filter-topic" multiple>
-                        <option value="all">Tutti gli argomenti</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="filter-label">Label</label>
-                    <select id="filter-label" multiple>
-                        <option value="all">Tutte le label</option>
-                    </select>
-                </div>
+            <div class="filter-section">
+                <div class="filter-title">Canali Social</div>
+                <div class="checkbox-list" id="list-platforms"></div>
             </div>
 
-            <button id="btn-export" class="btn-secondary">Esporta in JSON</button>
-        </div>
+            <div class="filter-section">
+                <div class="filter-title">Argomenti</div>
+                <input type="text" id="search-topic" class="search-input" placeholder="Cerca argomento...">
+                <div class="checkbox-list" id="list-topics"></div>
+            </div>
+
+            <div class="filter-section">
+                <div class="filter-title">Label</div>
+                <div class="checkbox-list" id="list-labels"></div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="table-container">
+                <table id="data-table">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Canale</th>
+                            <th>Argomento / Label</th>
+                            <th>Commenti</th>
+                            <th>Sentiment</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body">
+                        </tbody>
+                </table>
+            </div>
+        </main>
     </div>
 
-    <div class="section-card hidden" id="playground-section">
-        <h2 class="section-title">3. Playground Visuale</h2>
-        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
-            Anteprima dei post e dei commenti.
-        </p>
-        
-        <div id="dynamic-sort-ui" style="display: flex; gap: 10px; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center;">
-            <strong style="color: var(--brand-blue);">Ordina i post:</strong>
-            <button class="btn-secondary btn-small" style="margin:0;" onclick="currentSortOrder='date-asc'; sortFilteredData(); renderPlayground();">Meno recenti</button>
-            <button class="btn-secondary btn-small" style="margin:0;" onclick="currentSortOrder='date-desc'; sortFilteredData(); renderPlayground();">Più recenti</button>
-            <button class="btn-secondary btn-small" style="margin:0;" onclick="currentSortOrder='comments-asc'; sortFilteredData(); renderPlayground();">Meno commenti</button>
-            <button class="btn-secondary btn-small" style="margin:0;" onclick="currentSortOrder='comments-desc'; sortFilteredData(); renderPlayground();">Più commenti</button>
-        </div>
-
-        <div class="playground-container" id="playground-container">
+    <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+    <aside class="detail-drawer" id="detail-drawer">
+        <div class="drawer-header">
+            <div>
+                <span class="channel-tag" id="detail-platform">Canale</span>
+                <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;" id="detail-date">Data</div>
             </div>
-    </div>
-</div>
+            <button class="btn-close" onclick="closeDrawer()">×</button>
+        </div>
+        <div class="drawer-body">
+            <div class="detail-meta">
+                <div class="meta-box">
+                    <div class="meta-label">Label</div>
+                    <div class="meta-value" id="detail-label"></div>
+                </div>
+                <div class="meta-box">
+                    <div class="meta-label">Argomento</div>
+                    <div class="meta-value" id="detail-topic"></div>
+                </div>
+                <div class="meta-box" style="grid-column: span 2;">
+                    <div class="meta-label">Link Originale</div>
+                    <div class="meta-value"><a href="#" id="detail-link" target="_blank" style="color: var(--brand-blue);">Apri sulla piattaforma ↗</a></div>
+                </div>
+            </div>
+
+            <div class="detail-content" id="detail-content">Testo del post...</div>
+            
+            <h4 style="margin-bottom: 1rem; color: var(--brand-blue);">Commenti (<span id="detail-comment-count">0</span>)</h4>
+            <div class="comments-list" id="detail-comments-list">
+                </div>
+        </div>
+    </aside>
 
 <script>
+    // --- DIZIONARI E VARIABILI GLOBALI ---
     const LABEL_MAP = {
-        '#ISR': 'Investor e stakeholder relations',
-        '#PES': 'Prodotti e servizi',
-        '#TER': 'Territorio',
-        '#FIL': 'Filatelia',
-        '#CET': 'CSR e trasparenza',
-        '#DEI': 'Digital e Innovazione',
-        '#EB': 'Employer branding',
-        '#NED': 'News editoriali',
-        '#RIC': 'Ricorrenze',
-        '#ST': 'Storici',
-        '#MICO': 'Milano Cortina',
-        '#NAT': 'Campagna Natale'
+        '#ISR': 'Investor e stakeholder relations', '#PES': 'Prodotti e servizi',
+        '#TER': 'Territorio', '#FIL': 'Filatelia', '#CET': 'CSR e trasparenza',
+        '#DEI': 'Digital e Innovazione', '#EB': 'Employer branding', '#NED': 'News editoriali',
+        '#RIC': 'Ricorrenze', '#ST': 'Storici', '#MICO': 'Milano Cortina', '#NAT': 'Campagna Natale'
     };
+    const SENTIMENT_MAP = { 'positive': 'positivo', 'negative': 'negativo', 'neutral': 'neutro' };
 
-    const SENTIMENT_MAP = {
-        'positive': 'positivo',
-        'negative': 'negativo',
-        'neutral': 'neutro'
-    };
-
+    let rawDataPosts = null;
+    let rawDataComments = null;
     let aggregatedData = [];
     let filteredData = [];
-    let currentSortOrder = 'date-asc'; // Ordinamento di default
 
-    // Utility per estrarre valori dalle colonne ignorando differenze di maiuscole/spazi
-    function getColValue(row, colName) {
-        const target = colName.trim().toLowerCase();
-        const foundKey = Object.keys(row).find(key => key.trim().toLowerCase() === target);
-        return foundKey ? (row[foundKey] || '').toString().trim() : '';
+    // --- LOGICA DI UPLOAD UNIFICATO ---
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('file-input');
+    const statusText = document.getElementById('upload-status');
+
+    dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault(); dropzone.classList.remove('dragover');
+        handleFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+    async function handleFiles(files) {
+        if (files.length !== 2) {
+            statusText.innerText = "❌ Errore: Carica esattamente 2 file contemporaneamente (Post e Commenti).";
+            statusText.style.color = "var(--neg-color)";
+            return;
+        }
+
+        statusText.innerText = "⏳ Lettura dei file in corso...";
+        statusText.style.color = "var(--brand-blue)";
+
+        try {
+            const data1 = await parseAnyFile(files[0]);
+            const data2 = await parseAnyFile(files[1]);
+
+            // Funzione di scansione flessibile: cerca parole chiave nelle intestazioni ignorando spazi, maiuscole e caratteri invisibili (BOM)
+            const identifyFile = (data) => {
+                if (!data || !data[0]) return 'unknown';
+                const keys = Object.keys(data[0]).map(k => k.toLowerCase().trim());
+                
+                // Se c'è 'parent id' o 'sentiment' o 'message content', è sicuramente il file commenti
+                if (keys.some(k => k.includes('parent id') || k.includes('sentiment') || k.includes('message content'))) {
+                    return 'comments';
+                }
+                // Se c'è 'content id', 'platform' o 'labels', è il file post
+                if (keys.some(k => k.includes('content id') || k.includes('platform') || k.includes('labels'))) {
+                    return 'posts';
+                }
+                return 'unknown';
+            };
+
+            const type1 = identifyFile(data1);
+            const type2 = identifyFile(data2);
+
+            // Assegnazione intelligente
+            if (type1 === 'posts' || type2 === 'comments') {
+                rawDataPosts = data1;
+                rawDataComments = data2;
+            } else if (type2 === 'posts' || type1 === 'comments') {
+                rawDataPosts = data2;
+                rawDataComments = data1;
+            } else {
+                throw new Error("Impossibile riconoscere le colonne. Assicurati che ci siano 'Content ID' nei post e 'Parent ID' nei commenti.");
+            }
+
+            statusText.innerText = "⚙️ Elaborazione dati e associazione commenti...";
+            
+            // Un piccolo ritardo per permettere al browser di aggiornare il testo UI
+            setTimeout(() => {
+                try {
+                    processData();
+                } catch (err) {
+                    statusText.innerText = "❌ Errore durante l'elaborazione: " + err.message;
+                    statusText.style.color = "var(--neg-color)";
+                }
+            }, 100);
+
+        } catch (error) {
+            console.error(error);
+            statusText.innerText = "❌ Errore: " + error.message;
+            statusText.style.color = "var(--neg-color)";
+        }
     }
 
-    // Utility per parsing
-    function parseFile(file) {
+    // --- PARSING ---
+    function parseAnyFile(file) {
         return new Promise((resolve, reject) => {
             const fileName = file.name.toLowerCase();
             if (fileName.endsWith('.csv')) {
                 Papa.parse(file, {
                     header: true, skipEmptyLines: true,
                     complete: (results) => resolve(results.data),
-                    error: (error) => reject(error)
+                    error: (err) => reject(err)
                 });
             } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
                 const reader = new FileReader();
@@ -308,216 +431,149 @@
                     try {
                         const data = new Uint8Array(e.target.result);
                         const workbook = XLSX.read(data, { type: 'array' });
-                        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                        const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                        const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: "" });
                         resolve(json);
-                    } catch (error) { reject(new Error("Errore Excel: " + error.message)); }
+                    } catch (err) { reject(err); }
                 };
-                reader.onerror = (error) => reject(error);
+                reader.onerror = (err) => reject(err);
                 reader.readAsArrayBuffer(file);
-            } else { reject(new Error("Formato file non supportato.")); }
+            } else {
+                reject(new Error("Formato non supportato. Usa CSV o Excel."));
+            }
         });
     }
 
-    // Utility per bottoni
-    function withButtonState(buttonId, loadingText, successText, action) {
-        const btn = document.getElementById(buttonId);
-        const originalText = btn.innerText;
-        btn.innerText = loadingText;
-        btn.disabled = true;
-        setTimeout(async () => {
-            try {
-                await action();
-                btn.innerText = successText;
-            } catch (error) {
-                console.error(error);
-                btn.innerText = "Errore: " + error.message;
-            } finally {
-                setTimeout(() => { btn.innerText = originalText; btn.disabled = false; }, 2000);
-            }
-        }, 100); 
+    // --- UTILITY ESTRAZIONE DATI ---
+    function getColValue(row, colName) {
+        const target = colName.trim().toLowerCase();
+        const foundKey = Object.keys(row).find(key => key.trim().toLowerCase() === target);
+        return foundKey ? (row[foundKey] || '').toString().trim() : '';
     }
 
-    // Utility per formattare la data riconoscendo formato corretto ita ed Excel serial number
     function parseCustomDate(dateString) {
         if (!dateString) return new Date(0);
         const str = String(dateString).trim();
-        
-        // 1. Controllo se arriva il seriale numerico "nascosto" di Excel (es: 45657.42755)
         if (!isNaN(str) && str.indexOf('/') === -1 && str.indexOf('-') === -1) {
             const excelSerial = parseFloat(str);
-            // Range di sicurezza per riconoscere le date Excel (tra 1927 e 2091)
             if (excelSerial > 10000 && excelSerial < 70000) {
-                // Calcola l'epoca convertendo da Excel (30 Dic 1899) a JS
                 const dateUTC = new Date(Math.round((excelSerial - 25569) * 86400000));
-                return new Date(
-                    dateUTC.getUTCFullYear(),
-                    dateUTC.getUTCMonth(),
-                    dateUTC.getUTCDate(),
-                    dateUTC.getUTCHours(),
-                    dateUTC.getUTCMinutes(),
-                    dateUTC.getUTCSeconds()
-                );
+                return new Date(dateUTC.getUTCFullYear(), dateUTC.getUTCMonth(), dateUTC.getUTCDate(), dateUTC.getUTCHours(), dateUTC.getUTCMinutes(), dateUTC.getUTCSeconds());
             }
         }
-
-        // 2. Intercetta stringhe con formato italiano: DD/MM/YYYY o DD/MM/YY + eventuali ore
         const parts = str.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
         if (parts) {
             let year = parseInt(parts[3], 10);
-            if (year < 100) year += 2000; // gestisce in automatico l'anno a 2 cifre
-            
-            return new Date(
-                year,
-                parseInt(parts[2], 10) - 1,             // Mese (JS usa indice 0-11)
-                parseInt(parts[1], 10),                 // Giorno
-                parts[4] ? parseInt(parts[4], 10) : 0,  // Ore
-                parts[5] ? parseInt(parts[5], 10) : 0,  // Minuti
-                parts[6] ? parseInt(parts[6], 10) : 0   // Secondi
-            );
+            if (year < 100) year += 2000;
+            return new Date(year, parseInt(parts[2], 10) - 1, parseInt(parts[1], 10), parts[4] ? parseInt(parts[4], 10) : 0, parts[5] ? parseInt(parts[5], 10) : 0, parts[6] ? parseInt(parts[6], 10) : 0);
         }
-        
-        // 3. Fallback al parser standard di sistema
         let d = new Date(dateString);
         return isNaN(d.getTime()) ? new Date(0) : d;
     }
 
     function formatDate(dateObj) {
-        if (!dateObj || isNaN(dateObj.getTime()) || dateObj.getTime() === 0) return "Data non disponibile";
-        return dateObj.toLocaleString('it-IT', { 
-            day: '2-digit', month: '2-digit', year: 'numeric', 
-            hour: '2-digit', minute: '2-digit' 
-        });
+        if (!dateObj || isNaN(dateObj.getTime()) || dateObj.getTime() === 0) return "Data N/D";
+        return dateObj.toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
 
-    // Processamento Principale
-    document.getElementById('btn-process').addEventListener('click', () => {
-        const fileContent = document.getElementById('file-content').files[0];
-        const fileCommunity = document.getElementById('file-community').files[0];
+    function formatCopyTextAdvanced(text) {
+        if (!text) return text;
+        const urls = [], tags = [];
+        let formatted = text.replace(/(https?:\/\/[^\s]+|www\.[^\s]+)/gi, match => {
+            const href = match.startsWith('http') ? match : 'http://' + match;
+            urls.push(`<a href="${href}" target="_blank" style="color: var(--brand-blue); font-weight: 500;">${match}</a>`);
+            return `__URL_${urls.length - 1}__`;
+        });
+        formatted = formatted.replace(/(#[a-zA-Z0-9_]+)/g, match => {
+            tags.push(`<span style="color: var(--brand-blue); font-weight: 500;">${match}</span>`);
+            return `__TAG_${tags.length - 1}__`;
+        });
+        formatted = formatted.replace(/\.([a-zA-Z]|\p{Emoji_Presentation}|\p{Extended_Pictographic})/gu, '.<br><br>$1');
+        tags.forEach((t, i) => formatted = formatted.replace(`__TAG_${i}__`, t));
+        urls.forEach((u, i) => formatted = formatted.replace(`__URL_${i}__`, u));
+        return formatted;
+    }
 
-        if (!fileContent || !fileCommunity) {
-            alert("Seleziona entrambi i file."); return;
-        }
-
-        withButtonState('btn-process', 'Elaborazione in corso...', 'Fatto!', async () => {
-            const rawContent = await parseFile(fileContent);
-            const rawCommunity = await parseFile(fileCommunity);
-            const postsMap = new Map();
+    // --- MOTORE ELABORAZIONE ---
+    function processData() {
+        const postsMap = new Map();
+        
+        // 1. Elabora Post
+        rawDataPosts.forEach((row, index) => {
+            let platform = getColValue(row, 'Platform');
+            const profileName = getColValue(row, 'Profile name');
+            let contentId = getColValue(row, 'Content ID');
             
-            // 1. Elabora Post
-            rawContent.forEach(row => {
-                const platform = getColValue(row, 'Platform');
-                const profileName = getColValue(row, 'Profile name');
-                let contentId = getColValue(row, 'Content ID');
-                
-                if (!contentId || !platform) return;
+            if (!contentId || !platform) return;
+            if (platform.toLowerCase().includes('linkedin') && contentId.includes(':')) contentId = contentId.split(':').pop();
 
-                // Normalizzazione per LinkedIn e altri canali: rimuove prefissi URN se presenti
-                if (platform.toLowerCase().includes('linkedin') && contentId.includes(':')) {
-                    contentId = contentId.split(':').pop();
+            const canaleCompleto = profileName ? `${platform} ${profileName}` : platform;
+            const rawLabels = getColValue(row, 'Labels').split(/[;,]/).map(s => s.trim());
+            let topicList = [], mappedLabelsList = [];
+
+            rawLabels.forEach(tag => {
+                if (tag.startsWith('#')) {
+                    if (LABEL_MAP[tag.toUpperCase()]) mappedLabelsList.push(LABEL_MAP[tag.toUpperCase()]);
+                } else if (tag.length > 0) {
+                    topicList.push(tag);
                 }
+            });
 
-                const canaleCompleto = profileName ? `${platform} ${profileName}` : platform;
+            const dateObj = parseCustomDate(getColValue(row, 'Date') || getColValue(row, 'Created time'));
+            
+            postsMap.set(`${platform.toLowerCase()}-${contentId.toLowerCase()}`, {
+                id: `post-${index}`, // ID interno per l'UI
+                DataOggetto: dateObj,
+                DataFormattata: formatDate(dateObj),
+                Canale: canaleCompleto,
+                Contenuto: getColValue(row, 'Content') || topicList.join(', '),
+                Argomento: topicList.join(', '),
+                Label: mappedLabelsList.join(', '),
+                Link: getColValue(row, 'View on platform'),
+                Commenti: []
+            });
+        });
 
-                const rawLabels = getColValue(row, 'Labels').split(/[;,]/).map(s => s.trim());
-                let topicList = [], mappedLabelsList = [];
+        // 2. Elabora Commenti
+        rawDataComments.forEach(row => {
+            let parentId = getColValue(row, 'Parent ID').toLowerCase();
+            if (parentId.includes(':') && (parentId.includes('linkedin') || parentId.includes('urn:li:'))) {
+                parentId = `linkedin-${parentId.split(':').pop()}`;
+            }
+            
+            let message = getColValue(row, 'Message Content') || getColValue(row, 'Care case ID') || '[Testo rimosso/vuoto]';
+            if (message === '[Testo rimosso/vuoto]' || message.toLowerCase().includes('rimosso') || message.trim() === '') return; 
 
-                rawLabels.forEach(tag => {
-                    if (tag.startsWith('#')) {
-                        const upperTag = tag.toUpperCase();
-                        if (LABEL_MAP[upperTag]) mappedLabelsList.push(LABEL_MAP[upperTag]);
-                    } else if (tag.length > 0) {
-                        topicList.push(tag);
-                    }
-                });
+            const dateObj = parseCustomDate(getColValue(row, 'Created time'));
 
-                const topic = topicList.join(', ');
-                let textContent = getColValue(row, 'Content');
-                if (!textContent) textContent = topic;
-                
-                const rawDate = getColValue(row, 'Date') || getColValue(row, 'Created time');
-                const dateObj = parseCustomDate(rawDate);
-
-                const matchKey = `${platform.toLowerCase()}-${contentId.toLowerCase()}`;
-                postsMap.set(matchKey, {
+            if (postsMap.has(parentId)) {
+                postsMap.get(parentId).Commenti.push({
                     DataOggetto: dateObj,
                     DataFormattata: formatDate(dateObj),
-                    Canale: canaleCompleto,
-                    CanaleBase: platform,
-                    Contenuto: textContent,
-                    Argomento: topic,
-                    Label: mappedLabelsList.join(', '),
-                    Link: getColValue(row, 'View on platform'),
-                    Commenti: []
+                    Testo: message,
+                    Sentiment: SENTIMENT_MAP[getColValue(row, 'Sentiment').toLowerCase()] || 'neutro'
                 });
-            });
-
-            // 2. Elabora Commenti
-            rawCommunity.forEach(row => {
-                let parentId = getColValue(row, 'Parent ID').toLowerCase();
-                
-                // Normalizzazione LinkedIn anche per i commenti per allineare le chiavi di unione
-                if (parentId.includes(':') && (parentId.includes('linkedin') || parentId.includes('urn:li:'))) {
-                    const cleanId = parentId.split(':').pop();
-                    parentId = `linkedin-${cleanId}`;
-                }
-                
-                let message = getColValue(row, 'Message Content');
-                if (!message) message = getColValue(row, 'Care case ID');
-                if (!message) message = '[Testo rimosso/vuoto]';
-
-                // Skip di messaggi rimossi
-                if (message === '[Testo rimosso/vuoto]' || message.toLowerCase().includes('rimosso') || message.trim() === '') {
-                    return; 
-                }
-
-                const rawSentiment = getColValue(row, 'Sentiment').toLowerCase();
-                const createdTimeRaw = getColValue(row, 'Created time');
-                const dateObj = parseCustomDate(createdTimeRaw);
-
-                if (parentId && postsMap.has(parentId)) {
-                    postsMap.get(parentId).Commenti.push({
-                        DataOggetto: dateObj,
-                        DataFormattata: formatDate(dateObj),
-                        Testo: message,
-                        Sentiment: SENTIMENT_MAP[rawSentiment] || 'neutro'
-                    });
-                }
-            });
-
-            // Filtra solo post che hanno commenti
-            aggregatedData = Array.from(postsMap.values()).filter(p => p.Commenti.length > 0);
-            
-            // Ordina i commenti per data
-            aggregatedData.forEach(post => {
-                post.Commenti.sort((a, b) => a.DataOggetto - b.DataOggetto);
-            });
-
-            filteredData = [...aggregatedData];
-
-            updateWorkspace();
-            applyFilters();
-            
-            document.getElementById('workspace-section').classList.remove('hidden');
-            document.getElementById('playground-section').classList.remove('hidden');
-        });
-    });
-
-    // Motore ricerca argomenti
-    document.getElementById('search-topic').addEventListener('input', (e) => {
-        const term = e.target.value.toLowerCase();
-        const options = document.getElementById('filter-topic').options;
-        for (let i = 0; i < options.length; i++) {
-            if (options[i].text.toLowerCase().includes(term) || options[i].value === 'all') {
-                options[i].style.display = '';
-            } else {
-                options[i].style.display = 'none';
             }
-        }
-    });
+        });
 
-    // Filtri UI
-    function updateWorkspace() {
+        // Tieni solo i post commentati e ordinali per data commenti
+        aggregatedData = Array.from(postsMap.values()).filter(p => p.Commenti.length > 0);
+        aggregatedData.forEach(post => post.Commenti.sort((a, b) => a.DataOggetto - b.DataOggetto));
+        
+        filteredData = [...aggregatedData];
+
+        // Nascondi overlay e mostra dashboard
+        document.getElementById('upload-overlay').style.display = 'none';
+        document.getElementById('dashboard-layout').classList.add('active');
+        document.getElementById('badge-posts').style.display = 'block';
+        document.getElementById('badge-comments').style.display = 'block';
+        document.getElementById('btn-export').style.display = 'block';
+
+        initSidebar();
+        applyFilters(); // Ordina e renderizza
+    }
+
+    // --- GESTIONE SIDEBAR E FILTRI ---
+    function initSidebar() {
         const platforms = new Set(), topics = new Set(), labels = new Set();
         aggregatedData.forEach(post => {
             if (post.Canale) platforms.add(post.Canale);
@@ -525,166 +581,172 @@
             if (post.Label) post.Label.split(',').forEach(l => { if(l.trim()) labels.add(l.trim()) });
         });
 
-        populateSelect('filter-platform', platforms, false);
-        populateSelect('filter-topic', topics, true);
-        populateSelect('filter-label', labels, true);
+        buildCheckboxes('list-platforms', platforms, 'filter-platform');
+        buildCheckboxes('list-topics', topics, 'filter-topic');
+        buildCheckboxes('list-labels', labels, 'filter-label');
+
+        // Ricerca argomento
+        document.getElementById('search-topic').addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            const items = document.querySelectorAll('#list-topics .checkbox-item');
+            items.forEach(item => {
+                const text = item.innerText.toLowerCase();
+                item.style.display = text.includes(term) ? '' : 'none';
+            });
+        });
     }
 
-    function populateSelect(elementId, dataSet, multiple) {
-        const select = document.getElementById(elementId);
-        select.innerHTML = multiple ? '' : '<option value="all">Tutti i canali</option>';
-        if (!multiple && select.id !== 'filter-platform') {
-            select.innerHTML = '<option value="all">Tutte le opzioni</option>';
-        }
-        
-        Array.from(dataSet).sort().forEach(item => {
-            const option = document.createElement('option');
-            option.value = item; option.textContent = item;
-            select.appendChild(option);
+    function buildCheckboxes(containerId, dataSet, namePrefix) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        Array.from(dataSet).sort().forEach((item, idx) => {
+            const id = `${namePrefix}-${idx}`;
+            container.innerHTML += `
+                <label class="checkbox-item">
+                    <input type="checkbox" value="${item.replace(/"/g, '&quot;')}" class="${namePrefix}" onchange="applyFilters()">
+                    <span>${item}</span>
+                </label>
+            `;
         });
+    }
+
+    function getCheckedValues(className) {
+        return Array.from(document.querySelectorAll(`.${className}:checked`)).map(cb => cb.value);
+    }
+
+    function resetFilters() {
+        document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+        document.getElementById('search-topic').value = '';
+        document.querySelectorAll('#list-topics .checkbox-item').forEach(item => item.style.display = '');
+        document.getElementById('sort-order').value = 'date-desc';
+        applyFilters();
     }
 
     function applyFilters() {
-        const platformFilter = document.getElementById('filter-platform').value;
-        const selectedTopics = Array.from(document.getElementById('filter-topic').selectedOptions).map(o => o.value).filter(v => v !== 'all');
-        const selectedLabels = Array.from(document.getElementById('filter-label').selectedOptions).map(o => o.value).filter(v => v !== 'all');
+        const selPlatforms = getCheckedValues('filter-platform');
+        const selTopics = getCheckedValues('filter-topic');
+        const selLabels = getCheckedValues('filter-label');
+        const sortOrder = document.getElementById('sort-order').value;
 
         filteredData = aggregatedData.filter(post => {
-            const matchPlatform = platformFilter === 'all' || post.Canale === platformFilter;
-            const matchTopic = selectedTopics.length === 0 || selectedTopics.some(t => post.Argomento.includes(t));
-            const matchLabel = selectedLabels.length === 0 || selectedLabels.some(l => post.Label.includes(l));
+            const matchPlatform = selPlatforms.length === 0 || selPlatforms.includes(post.Canale);
+            const matchTopic = selTopics.length === 0 || selTopics.some(t => post.Argomento.includes(t));
+            const matchLabel = selLabels.length === 0 || selLabels.some(l => post.Label.includes(l));
             return matchPlatform && matchTopic && matchLabel;
         });
 
-        let filteredComments = 0;
-        filteredData.forEach(post => filteredComments += post.Commenti.length);
-        
+        // Ordinamento
+        if (sortOrder === 'date-asc') filteredData.sort((a, b) => a.DataOggetto - b.DataOggetto);
+        else if (sortOrder === 'date-desc') filteredData.sort((a, b) => b.DataOggetto - a.DataOggetto);
+        else if (sortOrder === 'comments-asc') filteredData.sort((a, b) => a.Commenti.length - b.Commenti.length);
+        else if (sortOrder === 'comments-desc') filteredData.sort((a, b) => b.Commenti.length - a.Commenti.length);
+
+        // Update Statistiche
+        const totComments = filteredData.reduce((sum, p) => sum + p.Commenti.length, 0);
         document.getElementById('stat-posts').innerText = filteredData.length;
-        document.getElementById('stat-comments').innerText = filteredComments;
+        document.getElementById('stat-comments').innerText = totComments;
 
-        renderPlayground();
+        renderTable();
     }
 
-    document.getElementById('filter-platform').addEventListener('change', applyFilters);
-    document.getElementById('filter-topic').addEventListener('change', applyFilters);
-    document.getElementById('filter-label').addEventListener('change', applyFilters);
-
-    function sortFilteredData() {
-        if (currentSortOrder === 'date-asc') {
-            filteredData.sort((a, b) => a.DataOggetto - b.DataOggetto);
-        } else if (currentSortOrder === 'date-desc') {
-            filteredData.sort((a, b) => b.DataOggetto - a.DataOggetto);
-        } else if (currentSortOrder === 'comments-asc') {
-            filteredData.sort((a, b) => a.Commenti.length - b.Commenti.length);
-        } else if (currentSortOrder === 'comments-desc') {
-            filteredData.sort((a, b) => b.Commenti.length - a.Commenti.length);
-        }
-    }
-
-    // Formattazione Copy Avanzata
-    function formatCopyTextAdvanced(text) {
-        if (!text) return text;
-        
-        const urls = [];
-        // 1. Estrai e metti al sicuro i link (rendendoli anche blu)
-        let formatted = text.replace(/(https?:\/\/[^\s]+|www\.[^\s]+)/gi, (match) => {
-            const href = match.startsWith('http') ? match : 'http://' + match;
-            urls.push(`<a href="${href}" target="_blank" style="color: var(--brand-blue); font-weight: 500; text-decoration: none;">${match}</a>`);
-            return `__URL_${urls.length - 1}__`;
-        });
-
-        // 2. Estrai e metti al sicuro gli hashtag (rendendoli blu)
-        const tags = [];
-        formatted = formatted.replace(/(#[a-zA-Z0-9_]+)/g, (match) => {
-            tags.push(`<span style="color: var(--brand-blue); font-weight: 500;">${match}</span>`);
-            return `__TAG_${tags.length - 1}__`;
-        });
-
-        // 3. Applica l'a capo se un punto è attaccato a una lettera o a una emoji (non spezza gli URL o i tag perché sono stati sostituiti!)
-        formatted = formatted.replace(/\.([a-zA-Z]|\p{Emoji_Presentation}|\p{Extended_Pictographic})/gu, '.<br><br>$1');
-
-        // 4. Ripristina Hashtag e URL
-        tags.forEach((t, i) => formatted = formatted.replace(`__TAG_${i}__`, t));
-        urls.forEach((u, i) => formatted = formatted.replace(`__URL_${i}__`, u));
-
-        return formatted;
-    }
-
-    function renderPlayground() {
-        const container = document.getElementById('playground-container');
-        container.innerHTML = '';
+    // --- RENDER TABELLA (MASTER) ---
+    function renderTable() {
+        const tbody = document.getElementById('table-body');
+        tbody.innerHTML = '';
 
         if (filteredData.length === 0) {
-            container.innerHTML = '<p style="color: var(--text-muted);">Nessun dato corrispondente ai filtri selezionati.</p>';
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">Nessun post trovato con i filtri attuali.</td></tr>`;
             return;
         }
 
-        // Applica l'ordinamento richiesto
-        sortFilteredData();
+        filteredData.forEach(post => {
+            const tot = post.Commenti.length;
+            const pos = post.Commenti.filter(c => c.Sentiment === 'positivo').length;
+            const neu = post.Commenti.filter(c => c.Sentiment === 'neutro').length;
+            const neg = post.Commenti.filter(c => c.Sentiment === 'negativo').length;
+            
+            const wPos = tot ? (pos/tot)*100 : 0;
+            const wNeu = tot ? (neu/tot)*100 : 0;
+            const wNeg = tot ? (neg/tot)*100 : 0;
 
-        // Genera la lista piatta
-        filteredData.forEach((post, idx) => {
-            const total = post.Commenti.length;
-            const sent = post.Commenti.reduce((acc, c) => {
-                acc[c.Sentiment] = (acc[c.Sentiment] || 0) + 1;
-                return acc;
-            }, {});
+            // Argomento combinato visivamente
+            let topicCell = `<div style="font-weight: 500;">${post.Argomento || '-'}</div>`;
+            if (post.Label) topicCell += `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">🏷️ ${post.Label}</div>`;
 
-            const perc = (val) => total > 0 ? Math.round((val || 0) / total * 100) : 0;
-            const accordionId = `acc-post-${idx}`;
-
-            const card = document.createElement('div');
-            card.className = 'post-card';
-            card.innerHTML = `
-                <div class="post-header">
-                    <span class="post-platform">${post.Canale}</span>
-                    <span class="post-date">${post.DataFormattata}</span>
-                </div>
-                <div class="post-meta" style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center;">
-                    <div><strong>Label:</strong> ${post.Label || 'N/D'}</div>
-                    <div><strong>Argomento:</strong> ${post.Argomento || 'N/D'}</div>
-                    <div><strong>Link:</strong> <a href="${post.Link}" target="_blank" style="color: var(--brand-blue); font-weight: 500; text-decoration: none;">Apri Post</a></div>
-                    <div style="background: #eee; padding: 8px; border-radius: 4px; font-size: 0.85rem; display: flex; gap: 10px; flex-wrap: wrap;">
-                        <strong>Commenti (${total}):</strong> 
-                        <span style="color: #34c759; font-weight: bold;">Positivi: ${perc(sent.positivo)}%</span> | 
-                        <span style="color: #8e8e93; font-weight: bold;">Neutri: ${perc(sent.neutro)}%</span> | 
-                        <span style="color: #ff3b30; font-weight: bold;">Negativi: ${perc(sent.negativo)}%</span>
+            const tr = document.createElement('tr');
+            tr.onclick = () => openDrawer(post.id, tr);
+            tr.innerHTML = `
+                <td style="white-space: nowrap; color: var(--text-muted); font-size: 0.85rem;">${post.DataFormattata}</td>
+                <td><span class="channel-tag">${post.Canale}</span></td>
+                <td>${topicCell}</td>
+                <td style="font-weight: 600;">${tot}</td>
+                <td>
+                    <div class="sentiment-bar-container">
+                        <div class="s-pos" style="width: ${wPos}%"></div>
+                        <div class="s-neu" style="width: ${wNeu}%"></div>
+                        <div class="s-neg" style="width: ${wNeg}%"></div>
                     </div>
-                </div>
-                <div class="post-content" style="white-space: pre-wrap; word-break: break-word;">${formatCopyTextAdvanced(post.Contenuto)}</div>
-                <button class="btn-secondary btn-small" onclick="document.getElementById('${accordionId}').classList.toggle('hidden')">
-                    Mostra / Nascondi Commenti
-                </button>
-                <div id="${accordionId}" class="comments-section hidden">
-                    <div class="comments-list" style="margin-top:1.5rem;">
-                        ${post.Commenti.map(c => `
-                            <div class="comment-item ${c.Sentiment}">
-                                <div class="comment-header">
-                                    <span class="comment-date">${c.DataFormattata}</span>
-                                    <span class="comment-sentiment sentiment-text-${c.Sentiment}">${c.Sentiment}</span>
-                                </div>
-                                <div class="comment-body">${c.Testo}</div>
-                            </div>
-                        `).join('')}
+                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">
+                        ${wPos.toFixed(0)}% | ${wNeu.toFixed(0)}% | ${wNeg.toFixed(0)}%
                     </div>
-                </div>
+                </td>
             `;
-            container.appendChild(card);
+            tbody.appendChild(tr);
         });
     }
 
-    // Export in JSON base (mantenuto per eventuale integrazione successiva)
+    // --- GESTIONE PANNELLO LATERALE (DETAIL) ---
+    function openDrawer(postId, rowElement) {
+        // Evidenzia riga
+        document.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
+        if(rowElement) rowElement.classList.add('selected');
+
+        const post = aggregatedData.find(p => p.id === postId);
+        if(!post) return;
+
+        // Popola metadati
+        document.getElementById('detail-platform').innerText = post.Canale;
+        document.getElementById('detail-date').innerText = post.DataFormattata;
+        document.getElementById('detail-label').innerText = post.Label || '-';
+        document.getElementById('detail-topic').innerText = post.Argomento || '-';
+        document.getElementById('detail-link').href = post.Link || '#';
+        document.getElementById('detail-link').innerText = post.Link ? "Apri sulla piattaforma ↗" : "N/D";
+        document.getElementById('detail-content').innerHTML = formatCopyTextAdvanced(post.Contenuto);
+        document.getElementById('detail-comment-count').innerText = post.Commenti.length;
+
+        // Popola commenti
+        const commContainer = document.getElementById('detail-comments-list');
+        commContainer.innerHTML = post.Commenti.map(c => `
+            <div class="comment-item ${c.Sentiment}">
+                <div class="comment-header">
+                    <span class="comment-date">${c.DataFormattata}</span>
+                    <span class="comment-sentiment s-text-${c.Sentiment}">${c.Sentiment}</span>
+                </div>
+                <div style="font-size: 0.95rem;">${c.Testo}</div>
+            </div>
+        `).join('');
+
+        // Apri cassetto
+        document.getElementById('detail-drawer').classList.add('open');
+        document.getElementById('drawer-overlay').classList.add('active');
+    }
+
+    function closeDrawer() {
+        document.getElementById('detail-drawer').classList.remove('open');
+        document.getElementById('drawer-overlay').classList.remove('active');
+        document.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
+    }
+
+    // --- EXPORT JSON ---
     document.getElementById('btn-export').addEventListener('click', () => {
-        if (filteredData.length === 0) {
-            alert("Nessun dato da esportare."); return;
-        }
+        if (filteredData.length === 0) return alert("Nessun dato da esportare.");
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(filteredData, null, 2));
         const dlAnchorElem = document.createElement('a');
         dlAnchorElem.setAttribute("href", dataStr);
-        dlAnchorElem.setAttribute("download", "dati_social_filtrati.json");
+        dlAnchorElem.setAttribute("download", "dati_dashboard_filtrati.json");
         dlAnchorElem.click();
     });
-</script>
 
+</script>
 </body>
 </html>
