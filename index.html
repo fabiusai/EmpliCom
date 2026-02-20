@@ -593,13 +593,16 @@
                 let authorAnon = `Utente ${parentPlatform.charAt(0).toUpperCase() + parentPlatform.slice(1)}`;
                 if (!authorOriginal) authorOriginal = authorAnon;
 
+                let commentUrl = getColValue(row, 'url') || getColValue(row, 'permalink') || '';
+
                 parentPost.Commenti.push({
                     DataOggetto: dateObj,
                     DataFormattata: formatDate(dateObj),
                     Testo: message,
                     Sentiment: SENTIMENT_MAP[getColValue(row, 'Sentiment').toLowerCase()] || 'neutro',
                     AutoreOriginale: authorOriginal,
-                    AutoreAnonimo: authorAnon
+                    AutoreAnonimo: authorAnon,
+                    Link: commentUrl
                 });
             }
         });
@@ -795,11 +798,12 @@
         const commContainer = document.getElementById('detail-comments-list');
         commContainer.innerHTML = post.Commenti.map(c => {
             const authorToShow = isAnon ? c.AutoreAnonimo : c.AutoreOriginale;
+            const linkHtml = c.Link ? `<a href="${c.Link}" target="_blank" style="color: var(--brand-blue); margin-left: 0.5rem; display: inline-flex; align-items: center; vertical-align: middle;" title="Apri commento"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a>` : '';
             return `
             <div class="comment-item ${c.Sentiment}">
                 <div style="color: var(--brand-blue); font-weight: 700; font-size: 0.85rem; margin-bottom: 0.4rem;">${authorToShow}</div>
                 <div class="comment-header">
-                    <span class="comment-date">${c.DataFormattata}</span>
+                    <span class="comment-date" style="display: flex; align-items: center;">${c.DataFormattata}${linkHtml}</span>
                     <span class="comment-sentiment s-text-${c.Sentiment}">${c.Sentiment}</span>
                 </div>
                 <div style="font-size: 0.95rem;">${c.Testo}</div>
@@ -837,7 +841,8 @@
                     Data: c.DataFormattata,
                     Autore: isAnon ? c.AutoreAnonimo : c.AutoreOriginale,
                     Testo: c.Testo,
-                    Sentiment: c.Sentiment
+                    Sentiment: c.Sentiment,
+                    Link: c.Link
                 }))
             };
         });
