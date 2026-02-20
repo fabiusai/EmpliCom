@@ -220,6 +220,14 @@
     <header class="topbar">
         <h1>Social Data Dashboard</h1>
         <div class="topbar-right">
+            <div class="stat-badge" id="badge-sentiment" style="display: none; padding: 0.3rem 0.5rem; flex-direction: column; align-items: center; justify-content: center; min-width: 140px;">
+                <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; font-weight: bold;">Sentiment Globale</div>
+                <div class="sentiment-bar-container" style="width: 100%; height: 8px; margin: 0; border-radius: 4px;" id="global-sentiment-bar"></div>
+            </div>
+            <div class="stat-badge" style="display: flex; align-items: center; gap: 0.5rem; background-color: #f0fdf4; border-color: #bbf7d0;">
+                <input type="checkbox" id="toggle-anon" style="cursor: pointer; width: 16px; height: 16px;" onchange="handleAnonToggle()">
+                <label for="toggle-anon" style="cursor: pointer; font-weight: 600; font-size: 0.85rem; color: #166534;">Anonimizza</label>
+            </div>
             <div class="stat-badge" id="badge-posts" style="display: none;">Post: <span id="stat-posts">0</span></div>
             <div class="stat-badge" id="badge-comments" style="display: none;">Commenti: <span id="stat-comments">0</span></div>
             <button class="btn-export" id="btn-export" style="display: none;">Esporta JSON</button>
@@ -279,7 +287,7 @@
                         <tr>
                             <th>Data</th>
                             <th>Canale</th>
-                            <th>Argomento / Label</th>
+                            <th>Argomento / Contenuto</th>
                             <th>Commenti</th>
                             <th>Sentiment</th>
                         </tr>
@@ -295,7 +303,7 @@
     <aside class="detail-drawer" id="detail-drawer">
         <div class="drawer-header">
             <div>
-                <span class="channel-tag" id="detail-platform">Canale</span>
+                <div id="detail-platform" style="margin-bottom: 0.2rem;">Canale</div>
                 <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;" id="detail-date">Data</div>
             </div>
             <button class="btn-close" onclick="closeDrawer()">×</button>
@@ -338,6 +346,13 @@
     let rawDataComments = null;
     let aggregatedData = [];
     let filteredData = [];
+    let currentOpenPostId = null;
+
+    function handleAnonToggle() {
+        if(currentOpenPostId && document.getElementById('detail-drawer').classList.contains('open')) {
+            openDrawer(currentOpenPostId, null, true);
+        }
+    }
 
     // --- LOGICA DI UPLOAD UNIFICATO ---
     const dropzone = document.getElementById('dropzone');
@@ -366,26 +381,18 @@
             const data1 = await parseAnyFile(files[0]);
             const data2 = await parseAnyFile(files[1]);
 
-            // Funzione di scansione flessibile: cerca parole chiave nelle intestazioni ignorando spazi, maiuscole e caratteri invisibili (BOM)
+            // Funzione di scansione flessibile
             const identifyFile = (data) => {
                 if (!data || !data[0]) return 'unknown';
                 const keys = Object.keys(data[0]).map(k => k.toLowerCase().trim());
-                
-                // Se c'è 'parent id' o 'sentiment' o 'message content', è sicuramente il file commenti
-                if (keys.some(k => k.includes('parent id') || k.includes('sentiment') || k.includes('message content'))) {
-                    return 'comments';
-                }
-                // Se c'è 'content id', 'platform' o 'labels', è il file post
-                if (keys.some(k => k.includes('content id') || k.includes('platform') || k.includes('labels'))) {
-                    return 'posts';
-                }
+                if (keys.some(k => k.includes('parent id') || k.includes('sentiment') || k.includes('message content'))) return 'comments';
+                if (keys.some(k => k.includes('content id') || k.includes('platform') || k.includes('labels'))) return 'posts';
                 return 'unknown';
             };
 
             const type1 = identifyFile(data1);
             const type2 = identifyFile(data2);
 
-            // Assegnazione intelligente
             if (type1 === 'posts' || type2 === 'comments') {
                 rawDataPosts = data1;
                 rawDataComments = data2;
@@ -398,7 +405,6 @@
 
             statusText.innerText = "⚙️ Elaborazione dati e associazione commenti...";
             
-            // Un piccolo ritardo per permettere al browser di aggiornare il testo UI
             setTimeout(() => {
                 try {
                     processData();
@@ -493,18 +499,50 @@
         return formatted;
     }
 
+    function getPlatformLogo(platform, profileName) {
+        const p = (platform || '').toLowerCase();
+        let svg = '';
+        if (p.includes('facebook')) svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="var(--brand-blue)"><path d="M22.675 0h-21.35c-.732 0-1.325.593-1.325 1.325v21.351c0 .731.593 1.324 1.325 1.324h11.495v-9.294h-3.128v-3.622h3.128v-2.671c0-3.1 1.893-4.788 4.659-4.788 1.325 0 2.463.099 2.795.143v3.24l-1.918.001c-1.504 0-1.795.715-1.795 1.763v2.313h3.587l-.467 3.622h-3.12v9.293h6.116c.73 0 1.323-.593 1.323-1.325v-21.35c0-.732-.593-1.325-1.325-1.325z"/></svg>`;
+        else if (p.includes('instagram')) svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="var(--brand-blue)"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>`;
+        else if (p.includes('linkedin')) svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="var(--brand-blue)"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>`;
+        else if (p.includes('youtube')) svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="var(--brand-blue)"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>`;
+        else if (p.includes('twitter') || p.includes('x')) svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="var(--brand-blue)"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 22.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`;
+        else svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="var(--brand-blue)"><path d="M12 0a12 12 0 1012 12A12.013 12.013 0 0012 0zm0 22a10 10 0 1110-10 10.011 10.011 0 01-10 10z"/></svg>`;
+        
+        const nameToDisplay = profileName || platform || 'Sconosciuto';
+        return `<div style="display:flex; align-items:center; gap:0.5rem;" title="${platform}">${svg} <span style="font-weight:600; color: var(--text-main); font-size: 0.95rem;">${nameToDisplay}</span></div>`;
+    }
+
+    function truncateTextSafe(text, maxLength) {
+        if (!text || text.length <= maxLength) return text;
+        const truncated = text.substring(0, maxLength);
+        const lastSpace = truncated.lastIndexOf(' ');
+        if (lastSpace > 0) {
+            return truncated.substring(0, lastSpace) + ' (...)';
+        }
+        return truncated + ' (...)';
+    }
+
     // --- MOTORE ELABORAZIONE ---
     function processData() {
         const postsMap = new Map();
         
         // 1. Elabora Post
         rawDataPosts.forEach((row, index) => {
-            let platform = getColValue(row, 'Platform');
+            let platformRawOrig = getColValue(row, 'Platform');
             const profileName = getColValue(row, 'Profile name');
             let contentId = getColValue(row, 'Content ID');
             
-            if (!contentId || !platform) return;
-            if (platform.toLowerCase().includes('linkedin') && contentId.includes(':')) contentId = contentId.split(':').pop();
+            if (!contentId || !platformRawOrig) return;
+            
+            let platform = platformRawOrig.trim();
+            if (platform.toLowerCase() === 'twitter') {
+                platform = 'X';
+            } else {
+                platform = platform.charAt(0).toUpperCase() + platform.slice(1).toLowerCase();
+            }
+
+            if (platformRawOrig.toLowerCase().includes('linkedin') && contentId.includes(':')) contentId = contentId.split(':').pop();
 
             const canaleCompleto = profileName ? `${platform} ${profileName}` : platform;
             const rawLabels = getColValue(row, 'Labels').split(/[;,]/).map(s => s.trim());
@@ -520,11 +558,13 @@
 
             const dateObj = parseCustomDate(getColValue(row, 'Date') || getColValue(row, 'Created time'));
             
-            postsMap.set(`${platform.toLowerCase()}-${contentId.toLowerCase()}`, {
+            postsMap.set(`${platformRawOrig.toLowerCase()}-${contentId.toLowerCase()}`, {
                 id: `post-${index}`, // ID interno per l'UI
                 DataOggetto: dateObj,
                 DataFormattata: formatDate(dateObj),
                 Canale: canaleCompleto,
+                PlatformRaw: platform,
+                ProfileName: profileName,
                 Contenuto: getColValue(row, 'Content') || topicList.join(', '),
                 Argomento: topicList.join(', '),
                 Label: mappedLabelsList.join(', '),
@@ -546,11 +586,20 @@
             const dateObj = parseCustomDate(getColValue(row, 'Created time'));
 
             if (postsMap.has(parentId)) {
-                postsMap.get(parentId).Commenti.push({
+                const parentPost = postsMap.get(parentId);
+                const parentPlatform = parentPost.PlatformRaw || 'Social';
+                
+                let authorOriginal = getColValue(row, 'Community') || getColValue(row, 'Author Name') || getColValue(row, 'User') || getColValue(row, 'Sender Name');
+                let authorAnon = `Utente ${parentPlatform.charAt(0).toUpperCase() + parentPlatform.slice(1)}`;
+                if (!authorOriginal) authorOriginal = authorAnon;
+
+                parentPost.Commenti.push({
                     DataOggetto: dateObj,
                     DataFormattata: formatDate(dateObj),
                     Testo: message,
-                    Sentiment: SENTIMENT_MAP[getColValue(row, 'Sentiment').toLowerCase()] || 'neutro'
+                    Sentiment: SENTIMENT_MAP[getColValue(row, 'Sentiment').toLowerCase()] || 'neutro',
+                    AutoreOriginale: authorOriginal,
+                    AutoreAnonimo: authorAnon
                 });
             }
         });
@@ -641,10 +690,31 @@
         else if (sortOrder === 'comments-asc') filteredData.sort((a, b) => a.Commenti.length - b.Commenti.length);
         else if (sortOrder === 'comments-desc') filteredData.sort((a, b) => b.Commenti.length - a.Commenti.length);
 
-        // Update Statistiche
-        const totComments = filteredData.reduce((sum, p) => sum + p.Commenti.length, 0);
+        // Update Statistiche e Sentiment Globale
+        let totG = 0, posG = 0, neuG = 0, negG = 0;
+
+        filteredData.forEach(post => {
+            post.Commenti.forEach(c => {
+                totG++;
+                if (c.Sentiment === 'positivo') posG++;
+                else if (c.Sentiment === 'neutro') neuG++;
+                else if (c.Sentiment === 'negativo') negG++;
+            });
+        });
+
         document.getElementById('stat-posts').innerText = filteredData.length;
-        document.getElementById('stat-comments').innerText = totComments;
+        document.getElementById('stat-comments').innerText = totG;
+
+        if (totG > 0) {
+            document.getElementById('global-sentiment-bar').innerHTML = `
+                <div class="s-pos" style="width: ${(posG/totG)*100}%" title="Positivo"></div>
+                <div class="s-neu" style="width: ${(neuG/totG)*100}%" title="Neutro"></div>
+                <div class="s-neg" style="width: ${(negG/totG)*100}%" title="Negativo"></div>
+            `;
+            document.getElementById('badge-sentiment').style.display = 'flex';
+        } else {
+            document.getElementById('badge-sentiment').style.display = 'none';
+        }
 
         renderTable();
     }
@@ -669,24 +739,26 @@
             const wNeu = tot ? (neu/tot)*100 : 0;
             const wNeg = tot ? (neg/tot)*100 : 0;
 
-            // Argomento combinato visivamente
-            let topicCell = `<div style="font-weight: 500;">${post.Argomento || '-'}</div>`;
-            if (post.Label) topicCell += `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">🏷️ ${post.Label}</div>`;
+            // Argomento combinato visivamente e snippet copy
+            let topicCell = `<div style="font-weight: 500; font-size: 0.95rem;">${post.Argomento || '-'}</div>`;
+            if (post.Label) topicCell += `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">🏷️ ${post.Label}</div>`;
+            const snippet = truncateTextSafe(post.Contenuto, 90);
+            topicCell += `<div style="font-size: 0.85rem; color: #4b5563; margin-top: 6px; font-style: italic; line-height: 1.3;">"${snippet}"</div>`;
 
             const tr = document.createElement('tr');
             tr.onclick = () => openDrawer(post.id, tr);
             tr.innerHTML = `
                 <td style="white-space: nowrap; color: var(--text-muted); font-size: 0.85rem;">${post.DataFormattata}</td>
-                <td><span class="channel-tag">${post.Canale}</span></td>
-                <td>${topicCell}</td>
-                <td style="font-weight: 600;">${tot}</td>
+                <td>${getPlatformLogo(post.PlatformRaw, post.ProfileName)}</td>
+                <td style="max-width: 400px;">${topicCell}</td>
+                <td style="font-weight: 600; text-align: center;">${tot}</td>
                 <td>
                     <div class="sentiment-bar-container">
                         <div class="s-pos" style="width: ${wPos}%"></div>
                         <div class="s-neu" style="width: ${wNeu}%"></div>
                         <div class="s-neg" style="width: ${wNeg}%"></div>
                     </div>
-                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">
+                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; text-align: center;">
                         ${wPos.toFixed(0)}% | ${wNeu.toFixed(0)}% | ${wNeg.toFixed(0)}%
                     </div>
                 </td>
@@ -696,16 +768,21 @@
     }
 
     // --- GESTIONE PANNELLO LATERALE (DETAIL) ---
-    function openDrawer(postId, rowElement) {
-        // Evidenzia riga
-        document.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
-        if(rowElement) rowElement.classList.add('selected');
+    function openDrawer(postId, rowElement, isRefresh = false) {
+        currentOpenPostId = postId;
+        
+        if (!isRefresh) {
+            document.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
+            if(rowElement) rowElement.classList.add('selected');
+        }
 
         const post = aggregatedData.find(p => p.id === postId);
         if(!post) return;
 
+        const isAnon = document.getElementById('toggle-anon').checked;
+
         // Popola metadati
-        document.getElementById('detail-platform').innerText = post.Canale;
+        document.getElementById('detail-platform').innerHTML = getPlatformLogo(post.PlatformRaw, post.ProfileName);
         document.getElementById('detail-date').innerText = post.DataFormattata;
         document.getElementById('detail-label').innerText = post.Label || '-';
         document.getElementById('detail-topic').innerText = post.Argomento || '-';
@@ -716,15 +793,19 @@
 
         // Popola commenti
         const commContainer = document.getElementById('detail-comments-list');
-        commContainer.innerHTML = post.Commenti.map(c => `
+        commContainer.innerHTML = post.Commenti.map(c => {
+            const authorToShow = isAnon ? c.AutoreAnonimo : c.AutoreOriginale;
+            return `
             <div class="comment-item ${c.Sentiment}">
+                <div style="color: var(--brand-blue); font-weight: 700; font-size: 0.85rem; margin-bottom: 0.4rem;">${authorToShow}</div>
                 <div class="comment-header">
                     <span class="comment-date">${c.DataFormattata}</span>
                     <span class="comment-sentiment s-text-${c.Sentiment}">${c.Sentiment}</span>
                 </div>
                 <div style="font-size: 0.95rem;">${c.Testo}</div>
             </div>
-        `).join('');
+            `;
+        }).join('');
 
         // Apri cassetto
         document.getElementById('detail-drawer').classList.add('open');
@@ -735,15 +816,45 @@
         document.getElementById('detail-drawer').classList.remove('open');
         document.getElementById('drawer-overlay').classList.remove('active');
         document.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
+        currentOpenPostId = null;
     }
 
     // --- EXPORT JSON ---
     document.getElementById('btn-export').addEventListener('click', () => {
         if (filteredData.length === 0) return alert("Nessun dato da esportare.");
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(filteredData, null, 2));
+        
+        const isAnon = document.getElementById('toggle-anon').checked;
+        
+        const exportPayload = filteredData.map(post => {
+            return {
+                Data: post.DataFormattata,
+                Canale: post.Canale,
+                Argomento: post.Argomento,
+                Label: post.Label,
+                Link: post.Link,
+                Contenuto: post.Contenuto,
+                Commenti: post.Commenti.map(c => ({
+                    Data: c.DataFormattata,
+                    Autore: isAnon ? c.AutoreAnonimo : c.AutoreOriginale,
+                    Testo: c.Testo,
+                    Sentiment: c.Sentiment
+                }))
+            };
+        });
+
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
+        
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const min = String(now.getMinutes()).padStart(2, '0');
+        const filename = `dati_dashboard_${yyyy}${mm}${dd}_${hh}${min}.json`;
+
         const dlAnchorElem = document.createElement('a');
         dlAnchorElem.setAttribute("href", dataStr);
-        dlAnchorElem.setAttribute("download", "dati_dashboard_filtrati.json");
+        dlAnchorElem.setAttribute("download", filename);
         dlAnchorElem.click();
     });
 
