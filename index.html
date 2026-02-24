@@ -236,11 +236,14 @@
 
     <div id="upload-overlay">
         <div class="dropzone" id="dropzone">
-            <div class="dropzone-icon">📥</div>
-            <h2>Carica i dati dei social</h2>
-            <p style="color: var(--text-muted); margin-top: 0.5rem;">Seleziona o trascina qui contemporaneamente<br>sia il file dei Post che quello dei Commenti.</p>
-            <input type="file" id="file-input" multiple accept=".csv, .xls, .xlsx" style="display: none;">
-            <button class="dropzone-btn" onclick="document.getElementById('file-input').click()">Scegli i file (2)</button>
+ <div class="upload-icon">📁</div>
+            <p>Trascina qui i file per iniziare</p>
+            <div style="font-size: 0.9em; color: var(--text-muted); margin-top: 8px; line-height: 1.5;">
+                • <b>2 file</b> CSV/XLSX di Emplifi (Post + Commenti)<br>
+                • <b>oppure 1 file</b> JSON (Export precedente)
+            </div>
+            <input type="file" id="file-input" multiple accept=".csv, .xls, .xlsx, .json" style="display: none;">
+            <button class="dropzone-btn" onclick="document.getElementById('file-input').click()">Scegli i file</button>
             <p id="upload-status" style="margin-top: 1rem; font-weight: bold; color: var(--brand-blue);"></p>
         </div>
     </div>
@@ -362,8 +365,50 @@
     fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 
     async function handleFiles(files) {
+        // Controllo se è un singolo file JSON
+        if (files.length === 1 && files[0].name.toLowerCase().endsWith('.json')) {
+            statusText.innerText = "⏳ Importazione JSON in corso...";
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    aggregatedData = imported.map((item, idx) => ({
+                        id: `post-import-${idx}`,
+                        DataOggetto: parseCustomDate(item.Data),
+                        DataFormattata: item.Data,
+                        Canale: item.Canale,
+                        PlatformRaw: item.Canale.split(' ')[0],
+                        ProfileName: item.Canale.split(' ').slice(1).join(' '),
+                        Contenuto: item.Contenuto,
+                        Argomento: item.Argomento,
+                        Label: item.Label,
+                        Link: item.Link,
+                        Commenti: item.Commenti.map(c => ({
+                            ...c,
+                            DataOggetto: parseCustomDate(c.Data),
+                            DataFormattata: c.Data,
+                            AutoreOriginale: c.Autore,
+                            AutoreAnonimo: c.Autore
+                        }))
+                    }));
+                    filteredData = [...aggregatedData];
+                    document.getElementById('upload-overlay').style.display = 'none';
+                    document.getElementById('dashboard-layout').classList.add('active');
+                    document.getElementById('badge-posts').style.display = 'block';
+                    document.getElementById('badge-comments').style.display = 'block';
+                    document.getElementById('btn-export').style.display = 'block';
+                    initSidebar();
+                    applyFilters();
+                } catch (err) {
+                    statusText.innerText = "❌ Errore nel file JSON: " + err.message;
+                }
+            };
+            reader.readAsText(files[0]);
+            return;
+        }
+
         if (files.length !== 2) {
-            statusText.innerText = "❌ Errore: Carica esattamente 2 file contemporaneamente (Post e Commenti).";
+            statusText.innerText = "❌ Carica 2 file Emplifi o 1 file JSON.";
             statusText.style.color = "var(--neg-color)";
             return;
         }
@@ -384,6 +429,41 @@
                 return 'unknown';
             };
 
+            // Gestione Import JSON elaborato
+            if (files.length === 1 && files[0].name.toLowerCase().endsWith('.json')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const imported = JSON.parse(e.target.result);
+                        aggregatedData = imported.map((item, idx) => ({
+                            id: `post-import-${idx}`,
+                            DataOggetto: parseCustomDate(item.Data),
+                            DataFormattata: item.Data,
+                            Canale: item.Canale,
+                            PlatformRaw: item.Canale.split(' ')[0],
+                            ProfileName: item.Canale.split(' ').slice(1).join(' '),
+                            Contenuto: item.Contenuto,
+                            Argomento: item.Argomento,
+                            Label: item.Label,
+                            Link: item.Link,
+                            Commenti: item.Commenti.map(c => ({
+                                ...c,
+                                DataOggetto: parseCustomDate(c.Data),
+                                DataFormattata: c.Data,
+                                AutoreOriginale: c.Autore,
+                                AutoreAnonimo: c.Autore // Verrà gestito dal toggle
+                            }))
+                        }));
+                        filteredData = [...aggregatedData];
+                        finalizeProcess();
+                    } catch (err) {
+                        statusText.innerText = "❌ Errore nel parsing del JSON: " + err.message;
+                    }
+                };
+                reader.readAsText(files[0]);
+                return;
+            }
+
             const type1 = identifyFile(data1);
             const type2 = identifyFile(data2);
 
@@ -394,10 +474,20 @@
                 rawDataPosts = data2;
                 rawDataComments = data1;
             } else {
-                throw new Error("Impossibile riconoscere le colonne. Assicurati che ci siano 'Content ID' nei post e 'Parent ID' nei commenti.");
+                throw new Error("Impossibile riconoscere i file. Carica 2 file Emplifi o 1 file JSON esportato.");
             }
 
             statusText.innerText = "⚙️ Elaborazione dati e associazione commenti...";
+
+            function finalizeProcess() {
+                document.getElementById('upload-overlay').style.display = 'none';
+                document.getElementById('dashboard-layout').classList.add('active');
+                document.getElementById('badge-posts').style.display = 'block';
+                document.getElementById('badge-comments').style.display = 'block';
+                document.getElementById('btn-export').style.display = 'block';
+                initSidebar();
+                applyFilters();
+            }
             
             setTimeout(() => {
                 try {
