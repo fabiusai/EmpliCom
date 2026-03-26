@@ -37,7 +37,7 @@
             height: 100vh;
             display: flex;
             flex-direction: column;
-            overflow: hidden; /* Gestiamo lo scroll internamente */
+            overflow: hidden;
         }
 
         h1, h2, h3 { color: var(--brand-blue); font-weight: 600; }
@@ -46,14 +46,23 @@
         /* Top Bar */
         .topbar {
             background-color: var(--bg-panel);
-            padding: 1rem 1.5rem;
+            padding: 1rem 1.5rem 0 1.5rem;
             border-bottom: 1px solid var(--border-color);
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            flex-direction: column;
             z-index: 10;
         }
+        .topbar-header {
+            display: flex; justify-content: space-between; align-items: center; width: 100%; padding-bottom: 1rem;
+        }
         .topbar-right { display: flex; gap: 1rem; align-items: center; }
+        
+        /* Tabs */
+        .topbar-tabs { display: flex; gap: 2rem; width: 100%; font-size: 0.95rem; }
+        .tab-btn { cursor: pointer; font-weight: 500; color: var(--text-muted); border-bottom: 3px solid transparent; padding-bottom: 0.6rem; transition: all 0.2s; }
+        .tab-btn:hover { color: var(--brand-blue); }
+        .tab-btn.active { font-weight: 600; color: var(--brand-blue); border-bottom-color: var(--brand-blue); }
+
         .stat-badge {
             background: var(--bg-body); padding: 0.5rem 1rem;
             border-radius: 20px; font-weight: 500; font-size: 0.9rem;
@@ -65,11 +74,11 @@
             background-color: var(--brand-blue); color: white;
             padding: 0.5rem 1rem; border-radius: var(--radius-md); font-weight: 500;
         }
-        .btn-export:hover { background-color: var(--brand-blue-hover); }
+        .btn-export:hover { filter: brightness(0.9); }
 
         /* Area Caricamento Unificata */
         #upload-overlay {
-            position: absolute; top: 60px; left: 0; right: 0; bottom: 0;
+            position: absolute; top: 110px; left: 0; right: 0; bottom: 0;
             background-color: var(--bg-body); z-index: 20;
             display: flex; justify-content: center; align-items: center; padding: 2rem;
         }
@@ -80,7 +89,7 @@
             box-shadow: var(--shadow-md); transition: background 0.2s;
         }
         .dropzone.dragover { background: #eef2ff; }
-        .dropzone-icon { font-size: 3rem; margin-bottom: 1rem; }
+        .upload-icon { font-size: 3rem; margin-bottom: 1rem; }
         .dropzone-btn {
             background-color: var(--brand-yellow); color: var(--brand-blue);
             padding: 0.75rem 2rem; border-radius: var(--radius-md);
@@ -90,10 +99,14 @@
 
         /* Layout Dashboard Principale */
         .dashboard-layout {
-            display: flex; flex: 1; overflow: hidden;
-            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+            display: none; flex: 1; overflow: hidden;
+            opacity: 1; transition: opacity 0.3s;
         }
-        .dashboard-layout.active { opacity: 1; pointer-events: all; }
+
+        /* Argomenti Tab Layout */
+        #view-argomenti {
+            display: none; flex: 1; overflow-y: auto; padding: 1.5rem; background: var(--bg-body);
+        }
 
         /* Sidebar Filtri */
         .sidebar {
@@ -121,7 +134,6 @@
         .checkbox-list {
             max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;
         }
-        /* Scrollbar custom */
         .checkbox-list::-webkit-scrollbar { width: 6px; }
         .checkbox-list::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
         
@@ -142,11 +154,6 @@
         td { padding: 1rem; border-bottom: 1px solid var(--border-color); font-size: 0.95rem; vertical-align: middle; }
         tr:hover { background-color: #f8fafc; cursor: pointer; }
         tr.selected { background-color: #eff6ff; }
-        
-        .channel-tag {
-            background: var(--brand-blue); color: white; padding: 0.2rem 0.6rem;
-            border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
-        }
 
         /* Barra Sentiment Lineare */
         .sentiment-bar-container { width: 100px; height: 8px; background: var(--border-color); border-radius: 4px; display: flex; overflow: hidden; margin-top: 4px; }
@@ -156,7 +163,7 @@
 
         /* Pannello Dettaglio (Detail / Drawer) */
         .detail-drawer {
-            position: fixed; top: 60px; right: -600px; width: 500px; bottom: 0;
+            position: fixed; top: 110px; right: -600px; width: 500px; bottom: 0;
             background: var(--bg-panel); box-shadow: var(--shadow-drawer);
             transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 30;
             display: flex; flex-direction: column;
@@ -183,7 +190,6 @@
         
         .detail-content { font-size: 1rem; line-height: 1.6; margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); white-space: pre-wrap; word-break: break-word; }
         
-        /* Commenti nel pannello */
         .comments-list { display: flex; flex-direction: column; gap: 1rem; }
         .comment-item { padding: 1rem; border-radius: var(--radius-md); background: var(--bg-body); border-left: 4px solid var(--border-color); }
         .comment-item.positivo { border-left-color: var(--pos-color); }
@@ -197,9 +203,8 @@
         .s-text-negativo { color: var(--neg-color); }
         .s-text-neutro { color: var(--neu-color); }
 
-        /* Overlay scuro per chiudere cliccando fuori */
         .drawer-overlay {
-            position: fixed; top: 60px; left: 0; right: 0; bottom: 0;
+            position: fixed; top: 110px; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.3); z-index: 25; opacity: 0; pointer-events: none;
             transition: opacity 0.3s;
         }
@@ -218,25 +223,31 @@
 <body>
 
     <header class="topbar">
-        <h1>Social Data Dashboard</h1>
-        <div class="topbar-right">
-            <div class="stat-badge" id="badge-sentiment" style="display: none; padding: 0.3rem 0.5rem; flex-direction: column; align-items: center; justify-content: center; min-width: 140px;">
-                <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; font-weight: bold;">Sentiment Globale</div>
-                <div class="sentiment-bar-container" style="width: 100%; height: 8px; margin: 0; border-radius: 4px;" id="global-sentiment-bar"></div>
+        <div class="topbar-header">
+            <h1>Social Data Dashboard</h1>
+            <div class="topbar-right">
+                <div class="stat-badge" id="badge-sentiment" style="display: none; padding: 0.3rem 0.5rem; flex-direction: column; align-items: center; justify-content: center; min-width: 140px;">
+                    <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; font-weight: bold;">Sentiment Globale</div>
+                    <div class="sentiment-bar-container" style="width: 100%; height: 8px; margin: 0; border-radius: 4px;" id="global-sentiment-bar"></div>
+                </div>
+                <div class="stat-badge" style="display: flex; align-items: center; gap: 0.5rem; background-color: #f0fdf4; border-color: #bbf7d0;">
+                    <input type="checkbox" id="toggle-anon" style="cursor: pointer; width: 16px; height: 16px;" onchange="handleAnonToggle()">
+                    <label for="toggle-anon" style="cursor: pointer; font-weight: 600; font-size: 0.85rem; color: #166534;">Anonimizza</label>
+                </div>
+                <div class="stat-badge" id="badge-posts" style="display: none;">Post: <span id="stat-posts">0</span></div>
+                <div class="stat-badge" id="badge-comments" style="display: none;">Commenti: <span id="stat-comments">0</span></div>
+                <button class="btn-export" id="btn-export" style="display: none;" onclick="exportCurrentView()">Esporta</button>
             </div>
-            <div class="stat-badge" style="display: flex; align-items: center; gap: 0.5rem; background-color: #f0fdf4; border-color: #bbf7d0;">
-                <input type="checkbox" id="toggle-anon" style="cursor: pointer; width: 16px; height: 16px;" onchange="handleAnonToggle()">
-                <label for="toggle-anon" style="cursor: pointer; font-weight: 600; font-size: 0.85rem; color: #166534;">Anonimizza</label>
-            </div>
-            <div class="stat-badge" id="badge-posts" style="display: none;">Post: <span id="stat-posts">0</span></div>
-            <div class="stat-badge" id="badge-comments" style="display: none;">Commenti: <span id="stat-comments">0</span></div>
-            <button class="btn-export" id="btn-export" style="display: none;">Esporta JSON</button>
+        </div>
+        <div class="topbar-tabs" id="app-tabs">
+            <div class="tab-btn active" id="tab-main" onclick="switchTab('main')">Dashboard Dati</div>
+            <div class="tab-btn" id="tab-argomenti" onclick="switchTab('argomenti')">Argomenti Trattati</div>
         </div>
     </header>
 
     <div id="upload-overlay">
         <div class="dropzone" id="dropzone">
- <div class="upload-icon">📁</div>
+            <div class="upload-icon">📁</div>
             <p>Trascina qui i file per iniziare</p>
             <div style="font-size: 0.9em; color: var(--text-muted); margin-top: 8px; line-height: 1.5;">
                 • <b>2 file</b> CSV/XLSX di Emplifi (Post + Commenti)<br>
@@ -249,7 +260,6 @@
     </div>
 
     <div class="dashboard-layout" id="dashboard-layout">
-        
         <aside class="sidebar">
             <div class="sidebar-header">
                 <h3>Filtra Dati</h3>
@@ -286,10 +296,42 @@
                         </tr>
                     </thead>
                     <tbody id="table-body">
-                        </tbody>
+                    </tbody>
                 </table>
             </div>
         </main>
+    </div>
+
+    <div id="view-argomenti">
+        <details style="background:var(--bg-panel); border-radius:var(--radius-lg); padding:1.5rem; margin-bottom:1.5rem; border:1px solid var(--border-color); box-shadow:var(--shadow-sm);">
+            <summary style="cursor:pointer; font-weight:600; color:var(--brand-blue); font-size:1.1rem; list-style:none; outline:none; display:flex; align-items:center;">
+                ⚙️ Gestione DB Argomenti (JSON)
+            </summary>
+            <div style="margin-top:1.5rem; padding-top:1.5rem; border-top:1px solid var(--border-color);">
+                <div style="display:flex; gap:1rem; margin-bottom:1rem; align-items:center;">
+                    <input type="file" id="import-db-json" accept=".json" style="font-size:0.9rem;">
+                    <button onclick="exportDbJson()" class="btn-export">Esporta DB Attuale</button>
+                </div>
+                <div id="db-editor" style="max-height:400px; overflow-y:auto; border:1px solid var(--border-color); border-radius:var(--radius-md); padding:1rem; background:#f9fafb; display:flex; flex-direction:column; gap:0.5rem;">
+                    </div>
+                <button onclick="addDbTopic()" style="margin-top:1rem; padding:0.6rem 1rem; background:var(--brand-blue); color:white; border-radius:var(--radius-md); font-weight:600; border:none; cursor:pointer;">+ Aggiungi Argomento</button>
+            </div>
+        </details>
+
+        <div style="background:var(--bg-panel); border-radius:var(--radius-lg); padding:1.5rem; border:1px solid var(--border-color); box-shadow:var(--shadow-sm);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
+                <h2 style="color:var(--brand-blue); font-size:1.3rem; margin:0;">Risultati Analisi nei Commenti</h2>
+                <div style="display:flex; gap:1rem; align-items:center;">
+                    <select id="argomenti-filter" onchange="renderArgomentiChart()" style="padding:0.5rem 1rem; border-radius:var(--radius-md); border:1px solid var(--border-color); background:white; font-size:0.9rem; cursor:pointer; min-width:200px;">
+                        <option value="all">Tutti i canali (Totale)</option>
+                        <option value="split">Aggregato per canale (Quote)</option>
+                    </select>
+                    <button onclick="exportArgomentiExcel()" class="btn-export" style="background:#107c41; border:none;">Esporta Analisi (Excel)</button>
+                </div>
+            </div>
+            <div id="argomenti-chart" style="display:flex; flex-direction:column; gap:1.2rem;">
+                </div>
+        </div>
     </div>
 
     <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
@@ -320,8 +362,7 @@
             <div class="detail-content" id="detail-content">Testo del post...</div>
             
             <h4 style="margin-bottom: 1rem; color: var(--brand-blue);">Commenti (<span id="detail-comment-count">0</span>)</h4>
-            <div class="comments-list" id="detail-comments-list">
-                </div>
+            <div class="comments-list" id="detail-comments-list"></div>
         </div>
     </aside>
 
@@ -340,8 +381,9 @@
     let aggregatedData = [];
     let filteredData = [];
     let currentOpenPostId = null;
+    let currentActiveTab = 'main';
+    let topicDB = {}; // DB Argomenti
     
-    // Variabili per l'ordinamento della tabella principale
     let currentSortCol = 'date';
     let currentSortDir = 'desc';
 
@@ -349,6 +391,32 @@
         if(currentOpenPostId && document.getElementById('detail-drawer').classList.contains('open')) {
             openDrawer(currentOpenPostId, null, true);
         }
+    }
+
+    // --- LOGICA TABS ---
+    function switchTab(tabId) {
+        currentActiveTab = tabId;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('tab-' + tabId).classList.add('active');
+        
+        if(tabId === 'main') {
+            document.getElementById('dashboard-layout').style.display = 'flex';
+            document.getElementById('view-argomenti').style.display = 'none';
+            document.getElementById('btn-export').innerText = "Esporta JSON";
+        } else {
+            document.getElementById('dashboard-layout').style.display = 'none';
+            document.getElementById('view-argomenti').style.display = 'block';
+            document.getElementById('btn-export').innerText = "Esporta JSON / Dati";
+            
+            populateArgomentiFilters();
+            renderArgomentiDB();
+            renderArgomentiChart();
+        }
+    }
+
+    function exportCurrentView() {
+        if(currentActiveTab === 'main') exportMainJson();
+        else exportMainJson(); // Mantieni la stessa logica o cambia se serve
     }
 
     // --- LOGICA DI UPLOAD UNIFICATO ---
@@ -365,7 +433,6 @@
     fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 
     async function handleFiles(files) {
-        // Controllo se è un singolo file JSON
         if (files.length === 1 && files[0].name.toLowerCase().endsWith('.json')) {
             statusText.innerText = "⏳ Importazione JSON in corso...";
             const reader = new FileReader();
@@ -392,13 +459,7 @@
                         }))
                     }));
                     filteredData = [...aggregatedData];
-                    document.getElementById('upload-overlay').style.display = 'none';
-                    document.getElementById('dashboard-layout').classList.add('active');
-                    document.getElementById('badge-posts').style.display = 'block';
-                    document.getElementById('badge-comments').style.display = 'block';
-                    document.getElementById('btn-export').style.display = 'block';
-                    initSidebar();
-                    applyFilters();
+                    finalizeProcess();
                 } catch (err) {
                     statusText.innerText = "❌ Errore nel file JSON: " + err.message;
                 }
@@ -420,7 +481,6 @@
             const data1 = await parseAnyFile(files[0]);
             const data2 = await parseAnyFile(files[1]);
 
-            // Funzione di scansione flessibile
             const identifyFile = (data) => {
                 if (!data || !data[0]) return 'unknown';
                 const keys = Object.keys(data[0]).map(k => k.toLowerCase().trim());
@@ -428,41 +488,6 @@
                 if (keys.some(k => k.includes('content id') || k.includes('platform') || k.includes('labels'))) return 'posts';
                 return 'unknown';
             };
-
-            // Gestione Import JSON elaborato
-            if (files.length === 1 && files[0].name.toLowerCase().endsWith('.json')) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    try {
-                        const imported = JSON.parse(e.target.result);
-                        aggregatedData = imported.map((item, idx) => ({
-                            id: `post-import-${idx}`,
-                            DataOggetto: parseCustomDate(item.Data),
-                            DataFormattata: item.Data,
-                            Canale: item.Canale,
-                            PlatformRaw: item.Canale.split(' ')[0],
-                            ProfileName: item.Canale.split(' ').slice(1).join(' '),
-                            Contenuto: item.Contenuto,
-                            Argomento: item.Argomento,
-                            Label: item.Label,
-                            Link: item.Link,
-                            Commenti: item.Commenti.map(c => ({
-                                ...c,
-                                DataOggetto: parseCustomDate(c.Data),
-                                DataFormattata: c.Data,
-                                AutoreOriginale: c.Autore,
-                                AutoreAnonimo: c.Autore // Verrà gestito dal toggle
-                            }))
-                        }));
-                        filteredData = [...aggregatedData];
-                        finalizeProcess();
-                    } catch (err) {
-                        statusText.innerText = "❌ Errore nel parsing del JSON: " + err.message;
-                    }
-                };
-                reader.readAsText(files[0]);
-                return;
-            }
 
             const type1 = identifyFile(data1);
             const type2 = identifyFile(data2);
@@ -474,24 +499,15 @@
                 rawDataPosts = data2;
                 rawDataComments = data1;
             } else {
-                throw new Error("Impossibile riconoscere i file. Carica 2 file Emplifi o 1 file JSON esportato.");
+                throw new Error("Impossibile riconoscere i file.");
             }
 
             statusText.innerText = "⚙️ Elaborazione dati e associazione commenti...";
-
-            function finalizeProcess() {
-                document.getElementById('upload-overlay').style.display = 'none';
-                document.getElementById('dashboard-layout').classList.add('active');
-                document.getElementById('badge-posts').style.display = 'block';
-                document.getElementById('badge-comments').style.display = 'block';
-                document.getElementById('btn-export').style.display = 'block';
-                initSidebar();
-                applyFilters();
-            }
             
             setTimeout(() => {
                 try {
                     processData();
+                    finalizeProcess();
                 } catch (err) {
                     statusText.innerText = "❌ Errore durante l'elaborazione: " + err.message;
                     statusText.style.color = "var(--neg-color)";
@@ -499,10 +515,20 @@
             }, 100);
 
         } catch (error) {
-            console.error(error);
             statusText.innerText = "❌ Errore: " + error.message;
             statusText.style.color = "var(--neg-color)";
         }
+    }
+
+    function finalizeProcess() {
+        document.getElementById('upload-overlay').style.display = 'none';
+        switchTab('main');
+        document.getElementById('badge-posts').style.display = 'block';
+        document.getElementById('badge-comments').style.display = 'block';
+        document.getElementById('btn-export').style.display = 'block';
+        initSidebar();
+        applyFilters();
+        populateArgomentiFilters();
     }
 
     // --- PARSING ---
@@ -607,7 +633,7 @@
         return truncated + ' (...)';
     }
 
-    // --- MOTORE ELABORAZIONE ---
+    // --- MOTORE ELABORAZIONE POST E COMMENTI ---
     function processData() {
         const postsMap = new Map();
         
@@ -643,7 +669,7 @@
             const dateObj = parseCustomDate(getColValue(row, 'Date') || getColValue(row, 'Created time'));
             
             postsMap.set(`${platformRawOrig.toLowerCase()}-${contentId.toLowerCase()}`, {
-                id: `post-${index}`, // ID interno per l'UI
+                id: `post-${index}`,
                 DataOggetto: dateObj,
                 DataFormattata: formatDate(dateObj),
                 Canale: canaleCompleto,
@@ -691,21 +717,9 @@
             }
         });
 
-        // Tieni solo i post commentati e ordinali per data commenti
         aggregatedData = Array.from(postsMap.values()).filter(p => p.Commenti.length > 0);
         aggregatedData.forEach(post => post.Commenti.sort((a, b) => a.DataOggetto - b.DataOggetto));
-        
         filteredData = [...aggregatedData];
-
-        // Nascondi overlay e mostra dashboard
-        document.getElementById('upload-overlay').style.display = 'none';
-        document.getElementById('dashboard-layout').classList.add('active');
-        document.getElementById('badge-posts').style.display = 'block';
-        document.getElementById('badge-comments').style.display = 'block';
-        document.getElementById('btn-export').style.display = 'block';
-
-        initSidebar();
-        applyFilters(); // Ordina e renderizza
     }
 
     // --- GESTIONE SIDEBAR E FILTRI ---
@@ -721,7 +735,6 @@
         buildCheckboxes('list-topics', topics, 'filter-topic');
         buildCheckboxes('list-labels', labels, 'filter-label');
 
-        // Ricerca argomento
         document.getElementById('search-topic').addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase();
             const items = document.querySelectorAll('#list-topics .checkbox-item');
@@ -736,7 +749,6 @@
         const container = document.getElementById(containerId);
         container.innerHTML = '';
         Array.from(dataSet).sort().forEach((item, idx) => {
-            const id = `${namePrefix}-${idx}`;
             container.innerHTML += `
                 <label class="checkbox-item">
                     <input type="checkbox" value="${item.replace(/"/g, '&quot;')}" class="${namePrefix}" onchange="applyFilters()">
@@ -769,14 +781,12 @@
             currentSortCol = col;
             currentSortDir = 'desc';
         }
-        
         document.getElementById('sort-icon-date').innerText = '';
         document.getElementById('sort-icon-comments').innerText = '';
         
         const icon = currentSortDir === 'desc' ? '▼' : '▲';
         if(col === 'date') document.getElementById('sort-icon-date').innerText = icon;
         if(col === 'comments') document.getElementById('sort-icon-comments').innerText = icon;
-        
         applyFilters();
     }
 
@@ -833,12 +843,10 @@
         if(!post || !post.Commenti[commentIdx]) return;
         const c = post.Commenti[commentIdx];
         
-        // Modifica sentiment
         if(c.Sentiment === 'positivo') c.Sentiment = 'neutro';
         else if(c.Sentiment === 'neutro') c.Sentiment = 'negativo';
         else c.Sentiment = 'positivo';
         
-        // Aggiorna l'elemento DOM direttamente (per UX, non sparisce se c'è un filtro attivo)
         if(btnElement) {
             const item = btnElement.closest('.comment-item');
             if(item) {
@@ -848,8 +856,6 @@
             btnElement.className = `comment-sentiment s-text-${c.Sentiment}`;
             btnElement.innerHTML = `${c.Sentiment} ↻`;
         }
-        
-        // Ricalcola i filtri globali per aggiornare la barra e la tabella principale, ma SALTA il render del cassetto per evitare sparizioni
         applyFilters(true); 
     }
 
@@ -865,23 +871,18 @@
             return matchPlatform && matchTopic && matchLabel;
         });
 
-        // Ordinamento tramite header tabella
         filteredData.sort((a, b) => {
             let valA, valB;
             if(currentSortCol === 'date') {
                 valA = a.DataOggetto; valB = b.DataOggetto;
             } else if(currentSortCol === 'comments') {
                 valA = a.Commenti.length; valB = b.Commenti.length;
-            } else {
-                return 0;
-            }
+            } else { return 0; }
             if(currentSortDir === 'asc') return valA > valB ? 1 : (valA < valB ? -1 : 0);
             return valA < valB ? 1 : (valA > valB ? -1 : 0);
         });
 
-        // Update Statistiche e Sentiment Globale
         let totG = 0, posG = 0, neuG = 0, negG = 0;
-
         filteredData.forEach(post => {
             post.Commenti.forEach(c => {
                 totG++;
@@ -922,7 +923,6 @@
         renderTable();
     }
 
-    // --- RENDER TABELLA (MASTER) ---
     function renderTable() {
         const tbody = document.getElementById('table-body');
         tbody.innerHTML = '';
@@ -942,7 +942,6 @@
             const wNeu = tot ? (neu/tot)*100 : 0;
             const wNeg = tot ? (neg/tot)*100 : 0;
 
-            // Argomento combinato visivamente e snippet copy
             let topicCell = `<div style="font-weight: 500; font-size: 0.95rem;">${post.Argomento || '-'}</div>`;
             if (post.Label) topicCell += `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">🏷️ ${post.Label}</div>`;
             const snippet = truncateTextSafe(post.Contenuto, 90);
@@ -972,7 +971,7 @@
         });
     }
 
-    // --- GESTIONE PANNELLO LATERALE (DETAIL) ---
+    // --- PANNELLO LATERALE (DETAIL) ---
     function openDrawer(postId, rowElement, isRefresh = false) {
         currentOpenPostId = postId;
         
@@ -985,7 +984,6 @@
         const post = aggregatedData.find(p => p.id === postId);
         if(!post) return;
 
-        // Popola metadati
         document.getElementById('detail-platform').innerHTML = getPlatformLogo(post.PlatformRaw, post.ProfileName);
         document.getElementById('detail-date').innerText = post.DataFormattata;
         document.getElementById('detail-label').innerText = post.Label || '-';
@@ -994,7 +992,6 @@
         document.getElementById('detail-link').innerText = post.Link ? "Apri sulla piattaforma ↗" : "N/D";
         document.getElementById('detail-content').innerHTML = formatCopyTextAdvanced(post.Contenuto);
         
-        // Inizializza i controlli nel DOM SOLO una volta per evitare di perdere il focus durante la ricerca
         const commContainer = document.getElementById('detail-comments-list');
         let controls = document.getElementById('drawer-controls');
         if(!controls) {
@@ -1024,10 +1021,7 @@
             `;
         }
         
-        // Renderizza lista dei commenti
         renderDrawerComments();
-
-        // Apri cassetto
         document.getElementById('detail-drawer').classList.add('open');
         document.getElementById('drawer-overlay').classList.add('active');
     }
@@ -1039,12 +1033,230 @@
         currentOpenPostId = null;
     }
 
-    // --- EXPORT JSON ---
-    document.getElementById('btn-export').addEventListener('click', () => {
+    // --- TAB ARGOMENTI: GESTIONE DB E ANALISI ---
+    document.getElementById('import-db-json').addEventListener('change', function(e) {
+        let file = e.target.files[0];
+        if(!file) return;
+        let reader = new FileReader();
+        reader.onload = function(evt) {
+            try {
+                let imported = JSON.parse(evt.target.result);
+                topicDB = {};
+                // Se è un array di stringhe come argomenti_full_array.json
+                if(Array.isArray(imported)) {
+                    imported.forEach(item => {
+                        if(item && typeof item === 'string') {
+                            topicDB[item] = [item];
+                        }
+                    });
+                } else if(typeof imported === 'object') {
+                    topicDB = imported;
+                }
+                renderArgomentiDB();
+                renderArgomentiChart();
+                document.getElementById('import-db-json').value = '';
+                alert("DB Argomenti importato con successo!");
+            } catch(err) {
+                alert("Errore nel JSON: " + err.message);
+            }
+        };
+        reader.readAsText(file);
+    });
+
+    function renderArgomentiDB() {
+        let html = '';
+        Object.keys(topicDB).forEach(t => {
+            let escapedTopic = t.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            html += `
+            <div style="display:flex; gap:0.5rem; margin-bottom:0.2rem; align-items:center;">
+                <input type="text" value="${escapedTopic}" style="width:200px; padding:0.5rem; border:1px solid var(--border-color); border-radius:4px; font-weight:600;" onchange="renameDbTopic('${escapedTopic}', this.value)">
+                <input type="text" value="${topicDB[t].join(', ').replace(/"/g, '&quot;')}" style="flex:1; padding:0.5rem; border:1px solid var(--border-color); border-radius:4px;" onchange="updateDbTopic('${escapedTopic}', this.value)" placeholder="Parole chiave separate da virgola (es: bolletta, gas*)">
+                <button onclick="removeDbTopic('${escapedTopic}')" style="background:var(--neg-color); color:white; border-radius:4px; padding:0.5rem 0.8rem;" title="Rimuovi">X</button>
+            </div>`;
+        });
+        if(Object.keys(topicDB).length === 0) {
+            html = `<div style="color:var(--text-muted); font-style:italic;">Nessun argomento nel DB. Importa un JSON o aggiungi manualmente.</div>`;
+        }
+        document.getElementById('db-editor').innerHTML = html;
+    }
+
+    function renameDbTopic(oldName, newName) {
+        if(oldName === newName || !newName.trim()) return;
+        topicDB[newName] = topicDB[oldName];
+        delete topicDB[oldName];
+        renderArgomentiDB();
+        renderArgomentiChart();
+    }
+
+    function updateDbTopic(topic, kwString) {
+        topicDB[topic] = kwString.split(',').map(s => s.trim()).filter(s => s);
+        renderArgomentiChart();
+    }
+
+    function removeDbTopic(topic) {
+        if(confirm(`Rimuovere l'argomento "${topic}"?`)) {
+            delete topicDB[topic];
+            renderArgomentiDB();
+            renderArgomentiChart();
+        }
+    }
+
+    function addDbTopic() {
+        let name = "Nuovo Argomento " + Math.floor(Math.random()*1000);
+        topicDB[name] = [];
+        renderArgomentiDB();
+    }
+
+    function exportDbJson() {
+        if(Object.keys(topicDB).length === 0) return alert("DB vuoto.");
+        let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(topicDB, null, 2));
+        let dl = document.createElement('a');
+        dl.setAttribute("href", dataStr);
+        dl.setAttribute("download", "db_argomenti_poste.json");
+        dl.click();
+    }
+
+    function escapeRegExp(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function analyzeTopics(filter) {
+        let stats = {};
+        Object.keys(topicDB).forEach(t => {
+            stats[t] = { total: 0, channels: {} };
+        });
+
+        let topicRegexes = {};
+        Object.keys(topicDB).forEach(t => {
+            let kwList = topicDB[t].map(kw => {
+                let k = kw.trim();
+                if(!k) return null;
+                if(k.endsWith('*')) {
+                    return '\\b' + escapeRegExp(k.slice(0, -1)) + '[a-zA-ZÀ-ÿ0-9]*';
+                } else {
+                    return '\\b' + escapeRegExp(k) + '\\b';
+                }
+            }).filter(k => k);
+            if(kwList.length > 0) topicRegexes[t] = new RegExp(kwList.join('|'), 'gi');
+        });
+
+        if (aggregatedData) {
+            aggregatedData.forEach(post => {
+                let channel = post.Canale || 'Sconosciuto';
+                if(filter !== 'all' && filter !== 'split' && channel !== filter) return;
+
+                post.Commenti.forEach(c => {
+                    let text = c.Testo || '';
+                    Object.keys(topicRegexes).forEach(t => {
+                        if(topicRegexes[t]) {
+                            let matches = text.match(topicRegexes[t]);
+                            if (matches) {
+                                stats[t].total += matches.length;
+                                stats[t].channels[channel] = (stats[t].channels[channel] || 0) + matches.length;
+                            }
+                        }
+                    });
+                });
+            });
+        }
+        return stats;
+    }
+
+    function populateArgomentiFilters() {
+        let sel = document.getElementById('argomenti-filter');
+        let currentVal = sel.value;
+        let channels = new Set();
+        aggregatedData.forEach(p => channels.add(p.Canale));
+        
+        let html = `
+            <option value="all">Tutti i canali (Totale)</option>
+            <option value="split">Aggregato per canale (Quote)</option>
+        `;
+        Array.from(channels).sort().forEach(c => {
+            html += `<option value="${c}">Solo: ${c}</option>`;
+        });
+        sel.innerHTML = html;
+        if(Array.from(sel.options).some(o => o.value === currentVal)) sel.value = currentVal;
+    }
+
+    function renderArgomentiChart() {
+        let filter = document.getElementById('argomenti-filter').value;
+        let stats = analyzeTopics(filter);
+        let container = document.getElementById('argomenti-chart');
+        container.innerHTML = '';
+
+        let sortedTopics = Object.keys(stats).sort((a,b) => stats[b].total - stats[a].total);
+        let maxCount = Math.max(...sortedTopics.map(t => stats[t].total), 1);
+        let hasData = false;
+
+        sortedTopics.forEach(t => {
+            let s = stats[t];
+            if(s.total === 0) return;
+            hasData = true;
+
+            let width = (s.total / maxCount) * 100;
+            let details = '';
+            
+            if(filter === 'split') {
+                let parts = [];
+                Object.keys(s.channels).sort((a,b) => s.channels[b] - s.channels[a]).forEach(ch => {
+                    let pct = Math.round((s.channels[ch] / s.total) * 100);
+                    parts.push(`<b>${ch}</b>: ${s.channels[ch]} (${pct}%)`);
+                });
+                details = `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:6px; line-height:1.4;">${parts.join(' | ')}</div>`;
+            }
+
+            container.innerHTML += `
+                <div>
+                    <div style="display:flex; justify-content:space-between; font-size:0.95rem; font-weight:600; margin-bottom:6px; color:var(--text-main);">
+                        <span>${t}</span>
+                        <span>${s.total}</span>
+                    </div>
+                    <div style="width:100%; background:var(--border-color); height:16px; border-radius:8px; overflow:hidden;">
+                        <div style="width:${width}%; background:var(--brand-yellow); height:100%; transition:width 0.4s ease;"></div>
+                    </div>
+                    ${details}
+                </div>
+            `;
+        });
+
+        if(!hasData) {
+            container.innerHTML = `<div style="color:var(--text-muted); text-align:center; padding:2rem 0;">Nessun risultato trovato. Verifica che ci siano commenti e che le parole chiave siano configurate correttamente.</div>`;
+        }
+    }
+
+    function exportArgomentiExcel() {
+        let filter = document.getElementById('argomenti-filter').value;
+        let stats = analyzeTopics(filter);
+        let dataToExport = [];
+        let sortedTopics = Object.keys(stats).sort((a,b) => stats[b].total - stats[a].total);
+
+        sortedTopics.forEach(t => {
+            if(stats[t].total === 0) return;
+            let row = { "Argomento": t, "Totale Menzioni": stats[t].total };
+            if(filter === 'split') {
+                Object.keys(stats[t].channels).forEach(ch => {
+                    row[ch] = stats[t].channels[ch];
+                });
+            } else if(filter !== 'all' && filter !== 'split') {
+                row["Canale"] = filter;
+            }
+            dataToExport.push(row);
+        });
+
+        if(dataToExport.length === 0) return alert("Nessun dato da esportare.");
+
+        let ws = XLSX.utils.json_to_sheet(dataToExport);
+        let wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Analisi Argomenti");
+        XLSX.writeFile(wb, "Analisi_Argomenti_Commenti.xlsx");
+    }
+
+    // --- EXPORT JSON DASHBOARD PRINCIPALE ---
+    function exportMainJson() {
         if (filteredData.length === 0) return alert("Nessun dato da esportare.");
         
         const isAnon = document.getElementById('toggle-anon').checked;
-        
         const exportPayload = filteredData.map(post => {
             return {
                 Data: post.DataFormattata,
@@ -1064,21 +1276,16 @@
         });
 
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
-        
         const now = new Date();
-        const yyyy = now.getFullYear();
-        const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const dd = String(now.getDate()).padStart(2, '0');
-        const hh = String(now.getHours()).padStart(2, '0');
-        const min = String(now.getMinutes()).padStart(2, '0');
-        const filename = `dati_dashboard_${yyyy}${mm}${dd}_${hh}${min}.json`;
+        const filename = `dati_dashboard_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.json`;
 
         const dlAnchorElem = document.createElement('a');
         dlAnchorElem.setAttribute("href", dataStr);
         dlAnchorElem.setAttribute("download", filename);
         dlAnchorElem.click();
-    });
+    }
 
 </script>
 </body>
 </html>
+
