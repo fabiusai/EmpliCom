@@ -251,8 +251,7 @@
             <p>Trascina qui i file per iniziare</p>
             <div style="font-size: 0.9em; color: var(--text-muted); margin-top: 8px; line-height: 1.5;">
                 • <b>2 file</b> CSV/XLSX di Emplifi (Post + Commenti)<br>
-                • <b>oppure 1 file</b> JSON (Export precedente)<br>
-                • Puoi includere anche il file <b>JSON del DB Argomenti</b>
+                • <b>oppure 1 file</b> JSON (Export precedente)
             </div>
             <input type="file" id="file-input" multiple accept=".csv, .xls, .xlsx, .json" style="display: none;">
             <button class="dropzone-btn" onclick="document.getElementById('file-input').click()">Scegli i file</button>
@@ -319,47 +318,43 @@
             </div>
         </details>
 
-        <div id="charts-container" style="display:flex; gap:1.5rem; flex-wrap:wrap; align-items:flex-start;">
-            
-            <div style="flex:1; min-width:400px; background:var(--bg-panel); border-radius:var(--radius-lg); padding:1.5rem; border:1px solid var(--border-color); box-shadow:var(--shadow-sm);">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
-                    <h2 style="color:var(--brand-blue); font-size:1.3rem; margin:0;">Risultati Analisi nei Commenti</h2>
-                    <div style="display:flex; gap:1rem; align-items:center;">
-                        <select id="argomenti-filter" onchange="renderArgomentiChart()" style="padding:0.5rem 1rem; border-radius:var(--radius-md); border:1px solid var(--border-color); background:white; font-size:0.9rem; cursor:pointer; min-width:200px;">
-                            <option value="all">Tutti i canali (Totale)</option>
-                            <option value="split">Aggregato per canale (Quote)</option>
-                        </select>
-                        <button onclick="exportArgomentiExcel()" class="btn-export" style="background:#107c41; border:none;">Esporta Analisi (Excel)</button>
-                    </div>
-                </div>
-                <div class="bg-gray-100 p-4 rounded-lg mb-6 flex flex-wrap gap-6 items-end justify-center border border-gray-200" style="margin-top: 1.5rem;">
-                    <div class="flex flex-col gap-1">
-                        <label class="text-xs font-bold text-gray-500 uppercase" style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase;">Dimensione Font</label>
-                        <input type="range" id="chartFontSize" min="16" max="40" value="30" style="width: 8rem; height: 0.5rem; background: #d1d5db; border-radius: 0.5rem; cursor: pointer;">
-                    </div>
-                    <div class="flex flex-col gap-1 w-24">
-                        <label class="text-xs font-bold text-gray-500 uppercase" style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase;">Decimali</label>
-                        <input type="number" id="chartDecimals" min="0" max="2" value="1" style="padding: 0.25rem; border: 1px solid #d1d5db; border-radius: 0.25rem; text-align: center; font-weight: 700; color: #002b5c; width: 6rem;">
-                    </div>
-                    <div class="flex flex-col gap-1 w-32">
-                        <label class="text-xs font-bold text-gray-500 uppercase" title="Accorpa voci sotto questa percentuale" style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase;">Soglia 'Varie'</label>
-                        <input type="number" id="chartThreshold" min="0" max="100" step="0.5" value="0" placeholder="% min" style="padding: 0.25rem; border: 1px solid #d1d5db; border-radius: 0.25rem; text-align: center; font-weight: 700; color: #002b5c; width: 8rem;">
-                    </div>
-                    <div class="flex gap-2 pb-0.5">
-                        <button id="chartRefresh" onclick="renderArgomentiChart()" style="background-color: #0146bc; color: white; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 700; font-size: 0.875rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); border: none; cursor: pointer;">Aggiorna</button>
-                        <button id="chartReset" onclick="resetChartControls()" style="background-color: white; border: 1px solid #d1d5db; color: #4b5563; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 700; font-size: 0.875rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); cursor: pointer;">Reset</button>
-                    </div>
-                </div>
-                <div id="argomenti-chart-text-details" style="display:none; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.5;"></div>
-                <div style="position: relative; width: 100%; overflow-x: auto; display: flex; justify-content: center; padding-bottom: 1rem;">
-                    <canvas id="argomenti-canvas" width="1600" height="1100" style="width: 100%; max-width: 1000px; height: auto; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-radius: 8px; background: transparent;"></canvas>
-                </div>
-                <div style="text-align: center; margin-top: 1rem; display: flex; justify-content: center; gap: 0.75rem;">
-                    <button onclick="downloadChartPng()" style="background-color: white; color: var(--brand-blue); border: 1px solid var(--brand-blue); padding: 0.5rem 1rem; border-radius: var(--radius-md); font-weight: 500; font-size: 0.875rem; cursor: pointer;">Scarica PNG</button>
-                    <button onclick="downloadChartSvg()" style="background-color: white; color: var(--brand-blue); border: 1px solid var(--brand-blue); padding: 0.5rem 1rem; border-radius: var(--radius-md); font-weight: 500; font-size: 0.875rem; cursor: pointer;">Scarica SVG</button>
+        <div style="background:var(--bg-panel); border-radius:var(--radius-lg); padding:1.5rem; border:1px solid var(--border-color); box-shadow:var(--shadow-sm);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
+                <h2 style="color:var(--brand-blue); font-size:1.3rem; margin:0;">Risultati Analisi nei Commenti</h2>
+                <div style="display:flex; gap:1rem; align-items:center;">
+                    <select id="argomenti-filter" onchange="renderArgomentiChart()" style="padding:0.5rem 1rem; border-radius:var(--radius-md); border:1px solid var(--border-color); background:white; font-size:0.9rem; cursor:pointer; min-width:200px;">
+                        <option value="all">Tutti i canali (Totale)</option>
+                        <option value="split">Aggregato per canale (Quote)</option>
+                    </select>
+                    <button onclick="exportArgomentiExcel()" class="btn-export" style="background:#107c41; border:none;">Esporta Analisi (Excel)</button>
                 </div>
             </div>
-            
+                        <div class="bg-gray-100 p-4 rounded-lg mb-6 flex flex-wrap gap-6 items-end justify-center border border-gray-200" style="margin-top: 1.5rem;">
+                <div class="flex flex-col gap-1">
+                    <label class="text-xs font-bold text-gray-500 uppercase" style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase;">Dimensione Font</label>
+                    <input type="range" id="chartFontSize" min="16" max="40" value="30" style="width: 8rem; height: 0.5rem; background: #d1d5db; border-radius: 0.5rem; cursor: pointer;">
+                </div>
+                <div class="flex flex-col gap-1 w-24">
+                    <label class="text-xs font-bold text-gray-500 uppercase" style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase;">Decimali</label>
+                    <input type="number" id="chartDecimals" min="0" max="2" value="1" style="padding: 0.25rem; border: 1px solid #d1d5db; border-radius: 0.25rem; text-align: center; font-weight: 700; color: #002b5c; width: 6rem;">
+                </div>
+                <div class="flex flex-col gap-1 w-32">
+                    <label class="text-xs font-bold text-gray-500 uppercase" title="Accorpa voci sotto questa percentuale" style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase;">Soglia 'Varie'</label>
+                    <input type="number" id="chartThreshold" min="0" max="100" step="0.5" value="0" placeholder="% min" style="padding: 0.25rem; border: 1px solid #d1d5db; border-radius: 0.25rem; text-align: center; font-weight: 700; color: #002b5c; width: 8rem;">
+                </div>
+                <div class="flex gap-2 pb-0.5">
+                    <button id="chartRefresh" onclick="renderArgomentiChart()" style="background-color: #0146bc; color: white; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 700; font-size: 0.875rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); border: none; cursor: pointer;">Aggiorna</button>
+                    <button id="chartReset" onclick="resetChartControls()" style="background-color: white; border: 1px solid #d1d5db; color: #4b5563; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 700; font-size: 0.875rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); cursor: pointer;">Reset</button>
+                </div>
+            </div>
+            <div id="argomenti-chart-text-details" style="display:none; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.5;"></div>
+            <div style="position: relative; width: 100%; overflow-x: auto; display: flex; justify-content: center; padding-bottom: 1rem;">
+                <canvas id="argomenti-canvas" width="1600" height="1100" style="width: 100%; max-width: 1000px; height: auto; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-radius: 8px; background: transparent;"></canvas>
+            </div>
+            <div style="text-align: center; margin-top: 1rem; display: flex; justify-content: center; gap: 0.75rem;">
+                <button onclick="downloadChartPng()" style="background-color: white; color: var(--brand-blue); border: 1px solid var(--brand-blue); padding: 0.5rem 1rem; border-radius: var(--radius-md); font-weight: 500; font-size: 0.875rem; cursor: pointer;">Scarica PNG</button>
+                <button onclick="downloadChartSvg()" style="background-color: white; color: var(--brand-blue); border: 1px solid var(--brand-blue); padding: 0.5rem 1rem; border-radius: var(--radius-md); font-weight: 500; font-size: 0.875rem; cursor: pointer;">Scarica SVG</button>
+            </div>
         </div>
     </div>
 
@@ -462,129 +457,90 @@
     fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 
     async function handleFiles(files) {
+        if (files.length === 1 && files[0].name.toLowerCase().endsWith('.json')) {
+            statusText.innerText = "⏳ Importazione JSON in corso...";
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    aggregatedData = imported.map((item, idx) => ({
+                        id: `post-import-${idx}`,
+                        DataOggetto: parseCustomDate(item.Data),
+                        DataFormattata: item.Data,
+                        Canale: item.Canale,
+                        PlatformRaw: item.Canale.split(' ')[0],
+                        ProfileName: item.Canale.split(' ').slice(1).join(' '),
+                        Contenuto: item.Contenuto,
+                        Argomento: item.Argomento,
+                        Label: item.Label,
+                        Link: item.Link,
+                        Commenti: item.Commenti.map(c => ({
+                            ...c,
+                            DataOggetto: parseCustomDate(c.Data),
+                            DataFormattata: c.Data,
+                            AutoreOriginale: c.Autore,
+                            AutoreAnonimo: c.Autore
+                        }))
+                    }));
+                    filteredData = [...aggregatedData];
+                    finalizeProcess();
+                } catch (err) {
+                    statusText.innerText = "❌ Errore nel file JSON: " + err.message;
+                }
+            };
+            reader.readAsText(files[0]);
+            return;
+        }
+
+        if (files.length !== 2) {
+            statusText.innerText = "❌ Carica 2 file Emplifi o 1 file JSON.";
+            statusText.style.color = "var(--neg-color)";
+            return;
+        }
+
         statusText.innerText = "⏳ Lettura dei file in corso...";
         statusText.style.color = "var(--brand-blue)";
 
-        let emplifiFiles = [];
-        let exportJson = null;
-        let dbJson = null;
+        try {
+            const data1 = await parseAnyFile(files[0]);
+            const data2 = await parseAnyFile(files[1]);
 
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const name = file.name.toLowerCase();
-            if (name.endsWith('.csv') || name.endsWith('.xlsx') || name.endsWith('.xls')) {
-                emplifiFiles.push(file);
-            } else if (name.endsWith('.json')) {
-                try {
-                    const text = await new Promise(r => { const reader = new FileReader(); reader.onload = e => r(e.target.result); reader.readAsText(file); });
-                    const parsed = JSON.parse(text);
-                    if (Array.isArray(parsed) && parsed.length > 0 && (parsed[0].DataOggetto !== undefined || parsed[0].DataFormattata !== undefined)) {
-                        exportJson = parsed;
-                    } else if (typeof parsed === 'object' || (Array.isArray(parsed) && typeof parsed[0] === 'string')) {
-                        dbJson = parsed;
-                    }
-                } catch(e) { console.error("Errore lettura JSON", e); }
-            }
-        }
+            const identifyFile = (data) => {
+                if (!data || !data[0]) return 'unknown';
+                const keys = Object.keys(data[0]).map(k => k.toLowerCase().trim());
+                if (keys.some(k => k.includes('parent id') || k.includes('sentiment') || k.includes('message content'))) return 'comments';
+                if (keys.some(k => k.includes('content id') || k.includes('platform') || k.includes('labels'))) return 'posts';
+                return 'unknown';
+            };
 
-        // Se è stato caricato un DB Argomenti
-        if (dbJson) {
-            topicDB = {};
-            if(Array.isArray(dbJson)) {
-                dbJson.forEach(item => { if(item && typeof item === 'string') topicDB[item] = [item]; });
+            const type1 = identifyFile(data1);
+            const type2 = identifyFile(data2);
+
+            if (type1 === 'posts' || type2 === 'comments') {
+                rawDataPosts = data1;
+                rawDataComments = data2;
+            } else if (type2 === 'posts' || type1 === 'comments') {
+                rawDataPosts = data2;
+                rawDataComments = data1;
             } else {
-                topicDB = dbJson;
+                throw new Error("Impossibile riconoscere i file.");
             }
-            // Se è l'UNICO file caricato, andiamo direttamente agli argomenti
-            if (files.length === 1) {
-                renderArgomentiDB();
-                renderArgomentiChart();
-                statusText.innerText = "✅ DB Argomenti caricato con successo.";
-                setTimeout(() => { document.getElementById('upload-overlay').style.display = 'none'; switchTab('argomenti'); }, 1000);
-                return;
-            }
-        }
 
-        // Se è un export JSON precedente
-        if (exportJson) {
-            aggregatedData = exportJson.map((item, idx) => ({
-                id: `post-import-${idx}`,
-                DataOggetto: parseCustomDate(item.Data),
-                DataFormattata: item.Data,
-                Canale: item.Canale,
-                PlatformRaw: item.Canale.split(' ')[0],
-                ProfileName: item.Canale.split(' ').slice(1).join(' '),
-                Contenuto: item.Contenuto,
-                Argomento: item.Argomento,
-                Label: item.Label,
-                Link: item.Link,
-                Commenti: item.Commenti.map(c => ({
-                    ...c,
-                    DataOggetto: parseCustomDate(c.Data),
-                    DataFormattata: c.Data,
-                    AutoreOriginale: c.Autore,
-                    AutoreAnonimo: c.Autore
-                }))
-            }));
-            filteredData = [...aggregatedData];
-            finalizeProcess();
-            return;
-        }
-
-        // Validazione Emplifi
-        if (emplifiFiles.length !== 2 && emplifiFiles.length > 0) {
-            statusText.innerText = "❌ Carica 2 file Emplifi (Post + Commenti).";
-            statusText.style.color = "var(--neg-color)";
-            return;
-        } else if (emplifiFiles.length === 0 && !exportJson && !dbJson) {
-            statusText.innerText = "❌ Nessun file supportato trovato.";
-            statusText.style.color = "var(--neg-color)";
-            return;
-        }
-
-        // Elaborazione file Emplifi
-        if (emplifiFiles.length === 2) {
-            try {
-                const data1 = await parseAnyFile(emplifiFiles[0]);
-                const data2 = await parseAnyFile(emplifiFiles[1]);
-
-                const identifyFile = (data) => {
-                    if (!data || !data[0]) return 'unknown';
-                    const keys = Object.keys(data[0]).map(k => k.toLowerCase().trim());
-                    if (keys.some(k => k.includes('parent id') || k.includes('sentiment') || k.includes('message content'))) return 'comments';
-                    if (keys.some(k => k.includes('content id') || k.includes('platform') || k.includes('labels'))) return 'posts';
-                    return 'unknown';
-                };
-
-                const type1 = identifyFile(data1);
-                const type2 = identifyFile(data2);
-
-                if (type1 === 'posts' || type2 === 'comments') {
-                    rawDataPosts = data1;
-                    rawDataComments = data2;
-                } else if (type2 === 'posts' || type1 === 'comments') {
-                    rawDataPosts = data2;
-                    rawDataComments = data1;
-                } else {
-                    throw new Error("Impossibile riconoscere i file. Assicurati di avere un file Post e un file Commenti.");
+            statusText.innerText = "⚙️ Elaborazione dati e associazione commenti...";
+            
+            setTimeout(() => {
+                try {
+                    processData();
+                    finalizeProcess();
+                } catch (err) {
+                    statusText.innerText = "❌ Errore durante l'elaborazione: " + err.message;
+                    statusText.style.color = "var(--neg-color)";
                 }
+            }, 100);
 
-                statusText.innerText = "⚙️ Elaborazione dati e associazione commenti...";
-                
-                setTimeout(() => {
-                    try {
-                        processData();
-                        finalizeProcess();
-                    } catch (err) {
-                        statusText.innerText = "❌ Errore durante l'elaborazione: " + err.message;
-                        statusText.style.color = "var(--neg-color)";
-                    }
-                }, 100);
-
-            } catch (error) {
-                statusText.innerText = "❌ Errore: " + error.message;
-                statusText.style.color = "var(--neg-color)";
-            }
+        } catch (error) {
+            statusText.innerText = "❌ Errore: " + error.message;
+            statusText.style.color = "var(--neg-color)";
         }
     }
 
@@ -1740,11 +1696,11 @@
     wcScript.src = "https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.2.2/wordcloud2.min.js";
     document.head.appendChild(wcScript);
 
-    // 2. Iniezione dell'interfaccia utente nella tab "Argomenti" (ora iniettato dentro il #charts-container)
-    const chartsContainer = document.getElementById('charts-container');
-    if (chartsContainer) {
+    // 2. Iniezione dell'interfaccia utente nella tab "Argomenti"
+    const viewArgomenti = document.getElementById('view-argomenti');
+    if (viewArgomenti) {
         const wcHtml = `
-        <div style="flex:1; min-width:400px; background:var(--bg-panel); border-radius:var(--radius-lg); padding:1.5rem; border:1px solid var(--border-color); box-shadow:var(--shadow-sm);">
+        <div style="background:var(--bg-panel); border-radius:var(--radius-lg); padding:1.5rem; border:1px solid var(--border-color); box-shadow:var(--shadow-sm); margin-top: 1.5rem; margin-bottom: 2rem;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
                 <h2 style="color:var(--brand-blue); font-size:1.3rem; margin:0;">Tag Cloud Commenti</h2>
                 <div style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
@@ -1762,7 +1718,7 @@
                 <canvas id="wc-canvas" width="800" height="800" style="max-width:100%; max-height:500px; height:auto;"></canvas>
             </div>
         </div>`;
-        chartsContainer.insertAdjacentHTML('beforeend', wcHtml);
+        viewArgomenti.insertAdjacentHTML('beforeend', wcHtml);
     }
 
     // 3. Patch della funzione esistente per popolare anche i filtri della Tag Cloud
@@ -1864,7 +1820,7 @@
             fontFamily: "'Arial Black', 'Impact', sans-serif",
             weightFactor: 1, // Usiamo le grandezze assolute precalcolate
             shape: 'circle',
-            ellipticity: 0.8, // Ridotto per schiacciare il cerchio in un ovale orizzontale
+            ellipticity: 1,
             origin: [canvas.width / 2, canvas.height / 2], // Forza il posizionamento a partire dal centro perfetto
             gridSize: 5, // Griglia molto stretta per un calcolo di collisione più preciso sui bordi
             color: function () {
@@ -1889,3 +1845,4 @@
 </script>
 </body>
 </html>
+
