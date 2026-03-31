@@ -329,8 +329,32 @@
                     <button onclick="exportArgomentiExcel()" class="btn-export" style="background:#107c41; border:none;">Esporta Analisi (Excel)</button>
                 </div>
             </div>
-            <div id="argomenti-chart" style="display:flex; flex-direction:column; gap:1.2rem;">
+                        <div class="bg-gray-100 p-4 rounded-lg mb-6 flex flex-wrap gap-6 items-end justify-center border border-gray-200" style="margin-top: 1.5rem;">
+                <div class="flex flex-col gap-1">
+                    <label class="text-xs font-bold text-gray-500 uppercase" style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase;">Dimensione Font</label>
+                    <input type="range" id="chartFontSize" min="16" max="40" value="30" style="width: 8rem; height: 0.5rem; background: #d1d5db; border-radius: 0.5rem; cursor: pointer;">
                 </div>
+                <div class="flex flex-col gap-1 w-24">
+                    <label class="text-xs font-bold text-gray-500 uppercase" style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase;">Decimali</label>
+                    <input type="number" id="chartDecimals" min="0" max="2" value="1" style="padding: 0.25rem; border: 1px solid #d1d5db; border-radius: 0.25rem; text-align: center; font-weight: 700; color: #002b5c; width: 6rem;">
+                </div>
+                <div class="flex flex-col gap-1 w-32">
+                    <label class="text-xs font-bold text-gray-500 uppercase" title="Accorpa voci sotto questa percentuale" style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase;">Soglia 'Varie'</label>
+                    <input type="number" id="chartThreshold" min="0" max="100" step="0.5" value="0" placeholder="% min" style="padding: 0.25rem; border: 1px solid #d1d5db; border-radius: 0.25rem; text-align: center; font-weight: 700; color: #002b5c; width: 8rem;">
+                </div>
+                <div class="flex gap-2 pb-0.5">
+                    <button id="chartRefresh" onclick="renderArgomentiChart()" style="background-color: #0146bc; color: white; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 700; font-size: 0.875rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); border: none; cursor: pointer;">Aggiorna</button>
+                    <button id="chartReset" onclick="resetChartControls()" style="background-color: white; border: 1px solid #d1d5db; color: #4b5563; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 700; font-size: 0.875rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); cursor: pointer;">Reset</button>
+                </div>
+            </div>
+            <div id="argomenti-chart-text-details" style="display:none; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.5;"></div>
+            <div style="position: relative; width: 100%; overflow-x: auto; display: flex; justify-content: center; padding-bottom: 1rem;">
+                <canvas id="argomenti-canvas" width="1600" height="1100" style="width: 100%; max-width: 1000px; height: auto; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-radius: 8px; background: transparent;"></canvas>
+            </div>
+            <div style="text-align: center; margin-top: 1rem; display: flex; justify-content: center; gap: 0.75rem;">
+                <button onclick="downloadChartPng()" style="background-color: white; color: var(--brand-blue); border: 1px solid var(--brand-blue); padding: 0.5rem 1rem; border-radius: var(--radius-md); font-weight: 500; font-size: 0.875rem; cursor: pointer;">Scarica PNG</button>
+                <button onclick="downloadChartSvg()" style="background-color: white; color: var(--brand-blue); border: 1px solid var(--brand-blue); padding: 0.5rem 1rem; border-radius: var(--radius-md); font-weight: 500; font-size: 0.875rem; cursor: pointer;">Scarica SVG</button>
+            </div>
         </div>
     </div>
 
@@ -1197,50 +1221,265 @@
         if(Array.from(sel.options).some(o => o.value === currentVal)) sel.value = currentVal;
     }
 
+        function resetChartControls() {
+        document.getElementById('chartFontSize').value = 30;
+        document.getElementById('chartDecimals').value = 1;
+        document.getElementById('chartThreshold').value = 0;
+        renderArgomentiChart();
+    }
+
     function renderArgomentiChart() {
         let filter = document.getElementById('argomenti-filter').value;
         let stats = analyzeTopics(filter);
-        let container = document.getElementById('argomenti-chart');
-        container.innerHTML = '';
+        let canvas = document.getElementById('argomenti-canvas');
+        let ctx = canvas.getContext('2d');
+        let textDetailsContainer = document.getElementById('argomenti-chart-text-details');
 
-        let sortedTopics = Object.keys(stats).sort((a,b) => stats[b].total - stats[a].total);
-        let maxCount = Math.max(...sortedTopics.map(t => stats[t].total), 1);
-        let hasData = false;
+        let threshold = parseFloat(document.getElementById('chartThreshold').value) || 0;
+        
+        let allTopics = Object.keys(stats).map(t => ({ label: t, value: stats[t].total, channels: stats[t].channels }));
+        let totalVal = allTopics.reduce((acc, curr) => acc + curr.value, 0);
 
-        sortedTopics.forEach(t => {
-            let s = stats[t];
-            if(s.total === 0) return;
-            hasData = true;
+        if (totalVal === 0) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = "40px 'Nunito Sans', sans-serif";
+            ctx.fillStyle = "#6b7280";
+            ctx.textAlign = "center";
+            ctx.fillText("Nessun risultato trovato.", canvas.width/2, canvas.height/2);
+            textDetailsContainer.style.display = 'none';
+            return;
+        }
 
-            let width = (s.total / maxCount) * 100;
-            let details = '';
-            
-            if(filter === 'split') {
-                let parts = [];
-                Object.keys(s.channels).sort((a,b) => s.channels[b] - s.channels[a]).forEach(ch => {
-                    let pct = Math.round((s.channels[ch] / s.total) * 100);
-                    parts.push(`<b>${ch}</b>: ${s.channels[ch]} (${pct}%)`);
-                });
-                details = `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:6px; line-height:1.4;">${parts.join(' | ')}</div>`;
+        let mainItems = [];
+        let othersValue = 0;
+        let othersChannels = {};
+
+        allTopics.forEach(item => {
+            let pct = (item.value / totalVal) * 100;
+            if (pct < threshold) {
+                othersValue += item.value;
+                if(filter === 'split') {
+                     Object.keys(item.channels).forEach(ch => {
+                         othersChannels[ch] = (othersChannels[ch] || 0) + item.channels[ch];
+                     });
+                }
+            } else if (item.value > 0) {
+                mainItems.push(item);
             }
-
-            container.innerHTML += `
-                <div>
-                    <div style="display:flex; justify-content:space-between; font-size:0.95rem; font-weight:600; margin-bottom:6px; color:var(--text-main);">
-                        <span style="cursor:pointer; color:var(--brand-blue); text-decoration:underline;" onclick="openTopicModal('${t.replace(/'/g, "\\'")}')" title="Clicca per vedere e gestire i commenti">${t}</span>
-                        <span>${s.total}</span>
-                    </div>
-                    <div style="width:100%; background:var(--border-color); height:16px; border-radius:8px; overflow:hidden;">
-                        <div style="width:${width}%; background:var(--brand-yellow); height:100%; transition:width 0.4s ease;"></div>
-                    </div>
-                    ${details}
-                </div>
-            `;
         });
 
-        if(!hasData) {
-            container.innerHTML = `<div style="color:var(--text-muted); text-align:center; padding:2rem 0;">Nessun risultato trovato. Verifica che ci siano commenti e che le parole chiave siano configurate correttamente.</div>`;
+        if (othersValue > 0) {
+            mainItems.push({ label: 'Altro', value: othersValue, channels: othersChannels, isOther: true });
         }
+
+        let sortedItems = mainItems.filter(x => !x.isOther).sort((a, b) => b.value - a.value);
+        let otherItem = mainItems.filter(x => x.isOther);
+        let data = [...sortedItems, ...otherItem];
+
+        // --- Gestione Dettaglio Canali (Testo a parte) ---
+        if (filter === 'split') {
+            let detailsHtml = '<strong>Ripartizione Canali:</strong><br>';
+            data.forEach(item => {
+                 let parts = [];
+                 Object.keys(item.channels).sort((a,b) => item.channels[b] - item.channels[a]).forEach(ch => {
+                     let pct = Math.round((item.channels[ch] / item.value) * 100);
+                     parts.push(`<b>${ch}</b>: ${item.channels[ch]} (${pct}%)`);
+                 });
+                 if(parts.length > 0) {
+                     detailsHtml += `<div style="margin-bottom: 4px;">• <span style="font-weight: 600; color: var(--brand-blue);">${item.label}</span>: ${parts.join(' | ')}</div>`;
+                 }
+            });
+            textDetailsContainer.innerHTML = detailsHtml;
+            textDetailsContainer.style.display = 'block';
+        } else {
+            textDetailsContainer.style.display = 'none';
+        }
+
+        // --- Disegno Canvas ---
+        let fontSize = parseInt(document.getElementById('chartFontSize').value) || 30;
+        let decimals = parseInt(document.getElementById('chartDecimals').value);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const w = canvas.width;
+        const h = canvas.height;
+        const marginLeft = 400;
+        const marginRight = 200;
+        const marginTop = 50;
+        const marginBottom = 50;
+        const chartW = w - marginLeft - marginRight;
+        const chartH = h - marginTop - marginBottom;
+
+        let maxPct = 0;
+        data.forEach(d => {
+            const val = (d.value / totalVal) * 100;
+            if(val > maxPct) maxPct = val;
+        });
+        const maxScale = maxPct * 1.1; 
+
+        ctx.beginPath();
+        ctx.strokeStyle = "#e5e7eb";
+        ctx.lineWidth = 2;
+        const steps = 5;
+        for(let i = 1; i <= steps; i++) {
+            const x = marginLeft + (chartW * (i / steps));
+            ctx.moveTo(x, marginTop);
+            ctx.lineTo(x, h - marginBottom);
+        }
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.strokeStyle = "#9ca3af";
+        ctx.lineWidth = 2;
+        ctx.moveTo(marginLeft, marginTop);
+        ctx.lineTo(marginLeft, h - marginBottom);
+        ctx.stroke();
+
+        const fontFace = "'Nunito Sans', 'Segoe UI', sans-serif";
+        const count = data.length;
+        const rowHeight = chartH / count;
+        const barHeight = rowHeight * 0.65; 
+
+        const getThemeColor = (idx, tot) => {
+             const stops = [
+                {p:0.0, c:{r:1, g:70, b:188}},   
+                {p:0.4, c:{r:138, g:182, b:249}}, 
+                {p:1.0, c:{r:220, g:238, b:255}}  
+             ];
+             if(tot<=1) return `rgb(${stops[0].c.r},${stops[0].c.g},${stops[0].c.b})`;
+             const t = idx/(tot-1);
+             let s=stops[0], e=stops[stops.length-1];
+             for(let i=0; i<stops.length-1; i++){ if(t>=stops[i].p && t<=stops[i+1].p){ s=stops[i]; e=stops[i+1]; break; } }
+             const range = e.p - s.p, lt = (t-s.p)/range;
+             const r = Math.round(s.c.r + (e.c.r-s.c.r)*lt);
+             const g = Math.round(s.c.g + (e.c.g-s.c.g)*lt);
+             const b = Math.round(s.c.b + (e.c.b-s.c.b)*lt);
+             return `rgb(${r},${g},${b})`;
+        };
+
+        data.forEach((d, i) => {
+            const pctVal = (d.value / totalVal) * 100;
+            const barW = (pctVal / maxScale) * chartW;
+            const yCenter = marginTop + (i * rowHeight) + (rowHeight / 2);
+            const yBar = yCenter - (barHeight / 2);
+
+            ctx.font = `normal ${fontSize}px ${fontFace}`;
+            ctx.fillStyle = "#0146bc"; 
+            ctx.textAlign = "right";
+            ctx.textBaseline = "middle";
+            ctx.fillText(d.label, marginLeft - 20, yCenter);
+
+            ctx.fillStyle = getThemeColor(i, count);
+            ctx.beginPath();
+            if (ctx.roundRect) {
+                ctx.roundRect(marginLeft, yBar, barW, barHeight, [0, 4, 4, 0]);
+            } else {
+                ctx.rect(marginLeft, yBar, barW, barHeight);
+            }
+            ctx.fill();
+
+            let pctString = parseFloat(pctVal.toFixed(decimals)).toLocaleString('it-IT', { 
+                minimumFractionDigits: 0, 
+                maximumFractionDigits: decimals 
+            }) + "%";
+
+            ctx.fillStyle = "#757575";
+            ctx.textAlign = "left";
+            ctx.fillText(pctString, marginLeft + barW + 15, yCenter);
+        });
+
+        window.currentChartData = data;
+    }
+
+    function downloadChartPng() {
+        const canvas = document.getElementById('argomenti-canvas');
+        const link = document.createElement('a');
+        link.download = `Argomenti_${new Date().toISOString().slice(0,10)}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    }
+
+    function downloadChartSvg() {
+        if (!window.currentChartData) return;
+        const data = window.currentChartData;
+        const w = 1600, h = 1100;
+        const total = data.reduce((a, b) => a + b.value, 0);
+        const fontSize = parseInt(document.getElementById('chartFontSize').value) || 30;
+        const decimals = parseInt(document.getElementById('chartDecimals').value);
+        
+        const marginLeft = 400, marginRight = 200, marginTop = 50, marginBottom = 50;
+        const chartW = w - marginLeft - marginRight;
+        const chartH = h - marginTop - marginBottom;
+        
+        let maxPct = 0;
+        data.forEach(d => {
+            const val = (d.value / total) * 100;
+            if(val > maxPct) maxPct = val;
+        });
+        const maxScale = maxPct * 1.1;
+
+        const getThemeColor = (idx, tot) => {
+             const stops = [
+                {p:0.0, c:{r:1, g:70, b:188}},   
+                {p:0.4, c:{r:138, g:182, b:249}}, 
+                {p:1.0, c:{r:220, g:238, b:255}}  
+             ];
+             if(tot<=1) return `rgb(${stops[0].c.r},${stops[0].c.g},${stops[0].c.b})`;
+             const t = idx/(tot-1);
+             let s=stops[0], e=stops[stops.length-1];
+             for(let i=0; i<stops.length-1; i++){ if(t>=stops[i].p && t<=stops[i+1].p){ s=stops[i]; e=stops[i+1]; break; } }
+             const range = e.p - s.p, lt = (t-s.p)/range;
+             const r = Math.round(s.c.r + (e.c.r-s.c.r)*lt);
+             const g = Math.round(s.c.g + (e.c.g-s.c.g)*lt);
+             const b = Math.round(s.c.b + (e.c.b-s.c.b)*lt);
+             return `rgb(${r},${g},${b})`;
+        };
+
+        let svg = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+        <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`;
+
+        const steps = 5;
+        for(let i = 1; i <= steps; i++) {
+            const x = marginLeft + (chartW * (i / steps));
+            svg += `<line x1="${x}" y1="${marginTop}" x2="${x}" y2="${h - marginBottom}" stroke="#e5e7eb" stroke-width="2" />`;
+        }
+        svg += `<line x1="${marginLeft}" y1="${marginTop}" x2="${marginLeft}" y2="${h - marginBottom}" stroke="#9ca3af" stroke-width="2" />`;
+
+        const count = data.length;
+        const rowHeight = chartH / count;
+        const barHeight = rowHeight * 0.65;
+        const r = 4; 
+        
+        data.forEach((d, i) => {
+            const pctVal = (d.value / total) * 100;
+            const barW = (pctVal / maxScale) * chartW;
+            const yCenter = marginTop + (i * rowHeight) + (rowHeight / 2);
+            const yBar = yCenter - (barHeight / 2);
+            
+            const x = marginLeft;
+            const y = yBar;
+            const hB = barHeight;
+            const pathD = `M ${x} ${y} L ${x+barW-r} ${y} Q ${x+barW} ${y} ${x+barW} ${y+r} L ${x+barW} ${y+hB-r} Q ${x+barW} ${y+hB} ${x+barW-r} ${y+hB} L ${x} ${y+hB} Z`;
+
+            const safeLabel = d.label.replace(/&/g, '&amp;');
+            svg += `<text x="${marginLeft - 20}" y="${yCenter + (fontSize * 0.35)}" text-anchor="end" fill="#0146bc" font-family="'Nunito Sans', sans-serif" font-size="${fontSize}" font-weight="400">${safeLabel}</text>`;
+            
+            svg += `<path d="${pathD}" fill="${getThemeColor(i, count)}" />`;
+            
+            let pctString = parseFloat(pctVal.toFixed(decimals)).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: decimals }) + "%";
+            svg += `<text x="${marginLeft + barW + 15}" y="${yCenter + (fontSize * 0.35)}" text-anchor="start" fill="#757575" font-family="'Nunito Sans', sans-serif" font-size="${fontSize}" font-weight="400">${pctString}</text>`;
+        });
+
+        svg += `</svg>`;
+        
+        const blob = new Blob([svg], {type: 'image/svg+xml;charset=utf-8'});
+        const url = URL.createObjectURL(blob);
+        const dlLink = document.createElement('a');
+        dlLink.href = url;
+        dlLink.download = `Argomenti_${new Date().toISOString().slice(0,10)}.svg`;
+        document.body.appendChild(dlLink);
+        dlLink.click();
+        document.body.removeChild(dlLink);
     }
 
     // --- MODALE DETTAGLIO ARGOMENTI ---
