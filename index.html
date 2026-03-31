@@ -1683,10 +1683,160 @@
         const now = new Date();
         const filename = `dati_dashboard_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.json`;
 
-        const dlAnchorElem = document.createElement('a');
+                const dlAnchorElem = document.createElement('a');
         dlAnchorElem.setAttribute("href", dataStr);
         dlAnchorElem.setAttribute("download", filename);
         dlAnchorElem.click();
+    }
+
+    // --- GENERAZIONE TAG CLOUD ---
+    
+    // 1. Caricamento dinamico della libreria WordCloud2.js
+    const wcScript = document.createElement('script');
+    wcScript.src = "https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.2.2/wordcloud2.min.js";
+    document.head.appendChild(wcScript);
+
+        // 2. Iniezione dell'interfaccia utente nella tab "Argomenti"
+    const viewArgomenti = document.getElementById('view-argomenti');
+    if (viewArgomenti) {
+        const wcHtml = `
+        <div style="background:var(--bg-panel); border-radius:var(--radius-lg); padding:1.5rem; border:1px solid var(--border-color); box-shadow:var(--shadow-sm); margin-top: 1.5rem; margin-bottom: 2rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
+                <h2 style="color:var(--brand-blue); font-size:1.3rem; margin:0;">Tag Cloud Commenti</h2>
+                <div style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
+                    <div style="display:flex; flex-direction:column; gap:0.2rem;">
+                        <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Freq. Minima: <span id="wc-min-freq-val">3</span></label>
+                        <input type="range" id="wc-min-freq" min="1" max="15" value="3" oninput="document.getElementById('wc-min-freq-val').innerText=this.value; renderWordCloud()" style="width:120px; cursor:pointer;">
+                    </div>
+                    <select id="wc-filter" onchange="renderWordCloud()" style="padding:0.5rem 1rem; border-radius:var(--radius-md); border:1px solid var(--border-color); background:white; font-size:0.9rem; cursor:pointer; min-width:200px;">
+                        <option value="all">Tutti i canali</option>
+                    </select>
+                    <button onclick="downloadWordCloud()" class="btn-export" style="background:white; color:var(--brand-blue); border:1px solid var(--brand-blue);">Scarica PNG</button>
+                </div>
+            </div>
+            <div style="width:100%; display:flex; justify-content:center; overflow:hidden; background:white; border-radius:8px;">
+                <canvas id="wc-canvas" width="800" height="800" style="max-width:100%; max-height:500px; height:auto;"></canvas>
+            </div>
+        </div>`;
+        viewArgomenti.insertAdjacentHTML('beforeend', wcHtml);
+    }
+
+    // 3. Patch della funzione esistente per popolare anche i filtri della Tag Cloud
+    const originalPopulate = window.populateArgomentiFilters;
+    window.populateArgomentiFilters = function() {
+        if (originalPopulate) originalPopulate();
+        
+        let wcSel = document.getElementById('wc-filter');
+        if (wcSel) {
+            let currentVal = wcSel.value;
+            let channels = new Set();
+            aggregatedData.forEach(p => channels.add(p.Canale));
+            let html = '<option value="all">Tutti i canali</option>';
+            Array.from(channels).sort().forEach(c => {
+                html += `<option value="${c}">Solo: ${c}</option>`;
+            });
+            wcSel.innerHTML = html;
+            if(Array.from(wcSel.options).some(o => o.value === currentVal)) wcSel.value = currentVal;
+        }
+
+        // Avvia il render quando la libreria è pronta
+        if (window.WordCloud) {
+            renderWordCloud();
+        } else {
+            wcScript.onload = renderWordCloud;
+        }
+    };
+
+    // Dizionario esteso di stop words italiane (parole da ignorare)
+    const stopWords = new Set(["il","lo","la","i","gli","le","un","uno","una","di","a","da","in","con","su","per","tra","fra","e","o","ma","se","che","non","è","sono","ha","hanno","mi","ti","ci","vi","si","ne","al","del","dei","delle","alla","alle","questo","quello","questa","quella","perchè","perché","come","più","anche","ed","ad","ho","hai","abbiamo","avete","sei","siete","era","erano","c'è","sarà","quando","dove","chi","cosa","fare","fatto","molto","poco","tutto","tutti","sempre","mai","solo","poi","già","ancora","ora","qui","lì","così","bene","male","grazie","ciao","buongiorno","buonasera","poste","italiane","piu"]);
+
+    // Funzione principale di rendering della nuvola
+    function renderWordCloud() {
+        if(!window.WordCloud) return;
+        const filter = document.getElementById('wc-filter').value;
+        const minFreq = parseInt(document.getElementById('wc-min-freq').value) || 3;
+        let text = "";
+        
+        // Estrazione testi
+        aggregatedData.forEach(post => {
+            if(filter === 'all' || post.Canale === filter) {
+                post.Commenti.forEach(c => {
+                    text += " " + c.Testo;
+                });
+            }
+        });
+
+        // Regex per isolare le parole (minimo 4 lettere)
+        const words = text.toLowerCase().match(/[a-zàèéìòù]{4,}/g) || [];
+        const counts = {};
+        words.forEach(w => {
+            if(!stopWords.has(w)) {
+                counts[w] = (counts[w] || 0) + 1;
+            }
+        });
+
+        // Ordinamento e filtro frequenza minima per rimuovere parole rare
+        const list = Object.keys(counts)
+            .map(w => [w, counts[w]])
+            .filter(item => item[1] >= minFreq)
+            .sort((a,b) => b[1] - a[1])
+            .slice(0, 150); // Manteniamo max 150 parole per un cerchio compatto e leggibile
+
+        const canvas = document.getElementById('wc-canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if(list.length === 0) {
+            ctx.font = "24px 'Nunito Sans', sans-serif";
+            ctx.fillStyle = "#6b7280";
+            ctx.textAlign = "center";
+            ctx.fillText("Nessuna parola raggiunge la frequenza minima.", canvas.width/2, canvas.height/2);
+            return;
+        }
+
+                // Normalizzazione LOGARITMICA del peso per attenuare il divario tra parole enormi e minuscole
+        const maxCount = list[0][1];
+        const minCount = list[list.length - 1][1];
+        const maxLog = Math.log(maxCount + 1);
+        const minLog = Math.log(minCount + 1);
+
+        const listNormalized = list.map(item => {
+            const range = maxLog - minLog || 1; 
+            const logNorm = (Math.log(item[1] + 1) - minLog) / range;
+            
+            // Scaliamo da un minimo di 16px a un massimo di 110px
+            let size = logNorm * 94 + 16; 
+            return [item[0], size];
+        });
+        
+        // Palette di toni del blu per matchare lo stile della tua immagine
+        const colors = ['#0146bc', '#4b73c4', '#8fa9e0', '#002b5c', '#2c529e', '#5a7fc4', '#b3c6ed'];
+
+        // Chiamata alla libreria per disegnare
+        WordCloud(canvas, {
+            list: listNormalized,
+            fontFamily: "'Arial Black', 'Impact', sans-serif", // Font più spesso per leggibilità
+            weightFactor: 1,
+            shape: 'circle', // Forma rotonda come richiesto
+            ellipticity: 1,  // Forza la proporzione perfettamente circolare
+            color: function () {
+                return colors[Math.floor(Math.random() * colors.length)];
+            },
+            rotateRatio: 0, // 0 = Solo parole orizzontali
+            backgroundColor: '#ffffff',
+            gridSize: 8, // Griglia più fitta per riempire meglio gli spazi ai bordi del cerchio
+            drawOutOfBound: false,
+            shrinkToFit: true
+        });
+    }
+
+    // Funzione per il download dell'immagine PNG
+    function downloadWordCloud() {
+        const canvas = document.getElementById('wc-canvas');
+        const link = document.createElement('a');
+        link.download = `TagCloud_Commenti_${new Date().toISOString().slice(0,10)}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
     }
 
 </script>
