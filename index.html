@@ -1683,7 +1683,7 @@
         const now = new Date();
         const filename = `dati_dashboard_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.json`;
 
-                const dlAnchorElem = document.createElement('a');
+                        const dlAnchorElem = document.createElement('a');
         dlAnchorElem.setAttribute("href", dataStr);
         dlAnchorElem.setAttribute("download", filename);
         dlAnchorElem.click();
@@ -1696,7 +1696,7 @@
     wcScript.src = "https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.2.2/wordcloud2.min.js";
     document.head.appendChild(wcScript);
 
-        // 2. Iniezione dell'interfaccia utente nella tab "Argomenti"
+    // 2. Iniezione dell'interfaccia utente nella tab "Argomenti"
     const viewArgomenti = document.getElementById('view-argomenti');
     if (viewArgomenti) {
         const wcHtml = `
@@ -1794,7 +1794,9 @@
             return;
         }
 
-                // Normalizzazione LOGARITMICA del peso per attenuare il divario tra parole enormi e minuscole
+        // Normalizzazione LOGARITMICA "schiacciata": 
+        // Riduce enormemente il divario visivo tra le parole più usate e quelle medie.
+        // Limitiamo la dimensione massima a ~52px su un canvas da 800px per far respirare il cerchio.
         const maxCount = list[0][1];
         const minCount = list[list.length - 1][1];
         const maxLog = Math.log(maxCount + 1);
@@ -1804,27 +1806,28 @@
             const range = maxLog - minLog || 1; 
             const logNorm = (Math.log(item[1] + 1) - minLog) / range;
             
-            // Scaliamo da un minimo di 16px a un massimo di 110px
-            let size = logNorm * 94 + 16; 
+            // Scaliamo da un minimo di 12px a un massimo di 52px
+            let size = logNorm * 40 + 12; 
             return [item[0], size];
         });
         
-        // Palette di toni del blu per matchare lo stile della tua immagine
+        // Palette di toni del blu
         const colors = ['#0146bc', '#4b73c4', '#8fa9e0', '#002b5c', '#2c529e', '#5a7fc4', '#b3c6ed'];
 
         // Chiamata alla libreria per disegnare
         WordCloud(canvas, {
             list: listNormalized,
-            fontFamily: "'Arial Black', 'Impact', sans-serif", // Font più spesso per leggibilità
-            weightFactor: 1,
-            shape: 'circle', // Forma rotonda come richiesto
-            ellipticity: 1,  // Forza la proporzione perfettamente circolare
+            fontFamily: "'Arial Black', 'Impact', sans-serif",
+            weightFactor: 1, // Usiamo le grandezze assolute precalcolate
+            shape: 'circle',
+            ellipticity: 1,
+            origin: [canvas.width / 2, canvas.height / 2], // Forza il posizionamento a partire dal centro perfetto
+            gridSize: 5, // Griglia molto stretta per un calcolo di collisione più preciso sui bordi
             color: function () {
                 return colors[Math.floor(Math.random() * colors.length)];
             },
-            rotateRatio: 0, // 0 = Solo parole orizzontali
+            rotateRatio: 0, 
             backgroundColor: '#ffffff',
-            gridSize: 8, // Griglia più fitta per riempire meglio gli spazi ai bordi del cerchio
             drawOutOfBound: false,
             shrinkToFit: true
         });
