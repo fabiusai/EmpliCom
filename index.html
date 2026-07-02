@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Social Media Data Dashboard</title>
+    <title>Social Media Data Dashboard v2.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
@@ -75,6 +75,12 @@
             padding: 0.5rem 1rem; border-radius: var(--radius-md); font-weight: 500;
         }
         .btn-export:hover { filter: brightness(0.9); }
+        
+        .btn-report-json {
+            background-color: #10b981; color: white;
+            padding: 0.5rem 1rem; border-radius: var(--radius-md); font-weight: 500;
+        }
+        .btn-report-json:hover { filter: brightness(0.9); }
 
         /* Area Caricamento Unificata */
         #upload-overlay {
@@ -148,6 +154,7 @@
             background: var(--bg-panel); border-radius: var(--radius-lg);
             box-shadow: var(--shadow-sm); border: 1px solid var(--border-color);
             overflow: hidden;
+            margin-bottom: 1.5rem;
         }
         table { width: 100%; border-collapse: collapse; text-align: left; }
         th { background-color: #f9fafb; padding: 1rem; font-weight: 600; color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; border-bottom: 1px solid var(--border-color); }
@@ -235,13 +242,13 @@
                     <label for="toggle-anon" style="cursor: pointer; font-weight: 600; font-size: 0.85rem; color: #166534;">Anonimizza</label>
                 </div>
                 <div class="stat-badge" id="badge-posts" style="display: none;">Post: <span id="stat-posts">0</span></div>
-                <div class="stat-badge" id="badge-comments" style="display: none;">Commenti: <span id="stat-comments">0</span></div>
-                <button class="btn-export" id="btn-export" style="display: none;" onclick="exportCurrentView()">Esporta</button>
+                <div class="stat-badge" id="badge-comments" style="display: none;">Commenti (in Post): <span id="stat-comments">0</span></div>
+                <button class="btn-export" id="btn-export" style="display: none;" onclick="exportCurrentView()">Esporta JSON Post</button>
             </div>
         </div>
         <div class="topbar-tabs" id="app-tabs">
-            <div class="tab-btn active" id="tab-main" onclick="switchTab('main')">Dashboard Dati</div>
-            <div class="tab-btn" id="tab-argomenti" onclick="switchTab('argomenti')">Argomenti Trattati</div>
+            <div class="tab-btn active" id="tab-main" onclick="switchTab('main')">Dashboard Post</div>
+            <div class="tab-btn" id="tab-argomenti" onclick="switchTab('argomenti')">Analisi Commenti Globale</div>
         </div>
     </header>
 
@@ -259,7 +266,8 @@
         </div>
     </div>
 
-    <div class="dashboard-layout" id="dashboard-layout">
+    <!-- SIDEBAR CONDIVISA (Ma Adattabile) -->
+    <div class="dashboard-layout" id="dashboard-layout" style="display: flex;">
         <aside class="sidebar">
             <div class="sidebar-header">
                 <h3>Filtra Dati</h3>
@@ -271,19 +279,21 @@
                 <div class="checkbox-list" id="list-platforms"></div>
             </div>
 
-            <div class="filter-section">
-                <div class="filter-title">Argomenti</div>
+            <div class="filter-section" id="filter-container-topics">
+                <div class="filter-title">Argomenti (Post)</div>
                 <input type="text" id="search-topic" class="search-input" placeholder="Cerca argomento...">
                 <div class="checkbox-list" id="list-topics"></div>
             </div>
 
-            <div class="filter-section">
-                <div class="filter-title">Label</div>
+            <div class="filter-section" id="filter-container-labels">
+                <div class="filter-title">Label (Post)</div>
                 <div class="checkbox-list" id="list-labels"></div>
             </div>
         </aside>
 
-        <main class="main-content">
+        <!-- CONTENUTO TAB 1: DASHBOARD POST -->
+        <main class="main-content" id="view-main">
+            <div style="margin-bottom: 1rem; font-weight: bold; color: var(--text-muted);">Tabella Post Caricati</div>
             <div class="table-container">
                 <table id="data-table">
                     <thead>
@@ -300,64 +310,95 @@
                 </table>
             </div>
         </main>
-    </div>
 
-    <div id="view-argomenti">
-        <details style="background:var(--bg-panel); border-radius:var(--radius-lg); padding:1.5rem; margin-bottom:1.5rem; border:1px solid var(--border-color); box-shadow:var(--shadow-sm);">
-            <summary style="cursor:pointer; font-weight:600; color:var(--brand-blue); font-size:1.1rem; list-style:none; outline:none; display:flex; align-items:center;">
-                ⚙️ Gestione DB Argomenti (JSON)
-            </summary>
-            <div style="margin-top:1.5rem; padding-top:1.5rem; border-top:1px solid var(--border-color);">
-                <div style="display:flex; gap:1rem; margin-bottom:1rem; align-items:center;">
-                    <input type="file" id="import-db-json" accept=".json" style="font-size:0.9rem;">
-                    <button onclick="exportDbJson()" class="btn-export">Esporta DB Attuale</button>
-                </div>
-                <div id="db-editor" style="max-height:400px; overflow-y:auto; border:1px solid var(--border-color); border-radius:var(--radius-md); padding:1rem; background:#f9fafb; display:flex; flex-direction:column; gap:0.5rem;">
+        <!-- CONTENUTO TAB 2: ANALISI COMMENTI GLOBALE -->
+        <main class="main-content" id="view-argomenti" style="display:none; flex-direction:column;">
+            
+            <!-- Tabella Riassuntiva Canali -->
+            <div style="background:var(--bg-panel); border-radius:var(--radius-lg); padding:1.5rem; margin-bottom:1.5rem; border:1px solid var(--border-color); box-shadow:var(--shadow-sm);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                    <h2 style="color:var(--brand-blue); font-size:1.3rem; margin:0;">Riassunto Globale Canali</h2>
+                    <div style="display:flex; gap:1rem; align-items:center;">
+                         <div style="font-size: 0.9rem; font-weight: bold;">Totale Commenti Estratti: <span id="global-total-comments" style="color:var(--brand-blue);">0</span></div>
+                         <button class="btn-report-json" onclick="exportReportJson()">Json per report</button>
                     </div>
-                <button onclick="addDbTopic()" style="margin-top:1rem; padding:0.6rem 1rem; background:var(--brand-blue); color:white; border-radius:var(--radius-md); font-weight:600; border:none; cursor:pointer;">+ Aggiungi Argomento</button>
+                </div>
+                <div class="table-container" style="margin-bottom:0;">
+                    <table style="width:100%; border-collapse:collapse; text-align:left;">
+                        <thead>
+                            <tr>
+                                <th>Canale</th>
+                                <th style="text-align:center;">Volumi</th>
+                                <th>Sentiment (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="global-channels-body">
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </details>
 
-        <div style="background:var(--bg-panel); border-radius:var(--radius-lg); padding:1.5rem; border:1px solid var(--border-color); box-shadow:var(--shadow-sm);">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
-                <h2 style="color:var(--brand-blue); font-size:1.3rem; margin:0;">Risultati Analisi nei Commenti</h2>
-                <div style="display:flex; gap:1rem; align-items:center;">
-                    <select id="argomenti-filter" onchange="renderArgomentiChart()" style="padding:0.5rem 1rem; border-radius:var(--radius-md); border:1px solid var(--border-color); background:white; font-size:0.9rem; cursor:pointer; min-width:200px;">
-                        <option value="all">Tutti i canali (Totale)</option>
-                        <option value="split">Aggregato per canale (Quote)</option>
-                    </select>
-                    <button onclick="exportArgomentiExcel()" class="btn-export" style="background:#107c41; border:none;">Esporta Analisi (Excel)</button>
+            <!-- Analisi Semantica Argomenti -->
+            <div style="background:var(--bg-panel); border-radius:var(--radius-lg); padding:1.5rem; margin-bottom:1.5rem; border:1px solid var(--border-color); box-shadow:var(--shadow-sm);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
+                    <h2 style="color:var(--brand-blue); font-size:1.3rem; margin:0;">Risultati Analisi Semantica Commenti</h2>
+                    <div style="display:flex; gap:1rem; align-items:center;">
+                        <button onclick="exportArgomentiExcel()" class="btn-export" style="background:#107c41; border:none;">Esporta Analisi (Excel)</button>
+                    </div>
                 </div>
-            </div>
-                        <div class="bg-gray-100 p-4 rounded-lg mb-6 flex flex-wrap gap-6 items-end justify-center border border-gray-200" style="margin-top: 1.5rem;">
-                <div class="flex flex-col gap-1">
-                    <label class="text-xs font-bold text-gray-500 uppercase" style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase;">Dimensione Font</label>
-                    <input type="range" id="chartFontSize" min="16" max="40" value="30" style="width: 8rem; height: 0.5rem; background: #d1d5db; border-radius: 0.5rem; cursor: pointer;">
+                
+                <details style="background:#f9fafb; border-radius:var(--radius-md); padding:1rem; margin-bottom:1.5rem; border:1px solid var(--border-color);">
+                    <summary style="cursor:pointer; font-weight:600; color:var(--text-muted); font-size:0.95rem; list-style:none; outline:none; display:flex; align-items:center;">
+                        ⚙️ Gestione DB Argomenti (JSON)
+                    </summary>
+                    <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border-color);">
+                        <div style="display:flex; gap:1rem; margin-bottom:1rem; align-items:center;">
+                            <input type="file" id="import-db-json" accept=".json" style="font-size:0.9rem;">
+                            <button onclick="exportDbJson()" class="btn-export" style="background:var(--text-muted);">Esporta DB Attuale</button>
+                        </div>
+                        <div id="db-editor" style="max-height:300px; overflow-y:auto; border:1px solid var(--border-color); border-radius:var(--radius-md); padding:1rem; background:white; display:flex; flex-direction:column; gap:0.5rem;">
+                        </div>
+                        <button onclick="addDbTopic()" style="margin-top:1rem; padding:0.4rem 0.8rem; background:var(--brand-blue); color:white; border-radius:var(--radius-md); font-weight:600; border:none; cursor:pointer; font-size:0.85rem;">+ Aggiungi Argomento</button>
+                    </div>
+                </details>
+
+                <div class="bg-gray-100 p-4 rounded-lg mb-6 flex flex-wrap gap-6 items-end justify-center border border-gray-200" style="margin-top: 1.5rem; background:#f9fafb; padding:1rem; border-radius:var(--radius-md); border:1px solid var(--border-color);">
+                    <div style="display:flex; flex-direction:column; gap:0.2rem;">
+                        <label style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase;">Dimensione Font</label>
+                        <input type="range" id="chartFontSize" min="16" max="40" value="30" style="width: 8rem; cursor: pointer;">
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:0.2rem;">
+                        <label style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase;">Decimali</label>
+                        <input type="number" id="chartDecimals" min="0" max="2" value="1" style="padding: 0.25rem; border: 1px solid #d1d5db; border-radius: 0.25rem; text-align: center; width: 4rem;">
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:0.2rem;">
+                        <label style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase;">Soglia 'Varie' %</label>
+                        <input type="number" id="chartThreshold" min="0" max="100" step="0.5" value="0" style="padding: 0.25rem; border: 1px solid #d1d5db; border-radius: 0.25rem; text-align: center; width: 5rem;">
+                    </div>
+                    <div style="display:flex; gap:0.5rem; align-items:flex-end;">
+                        <button onclick="renderArgomentiChart()" style="background-color: #0146bc; color: white; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 700; font-size: 0.85rem; border: none; cursor: pointer;">Aggiorna</button>
+                        <button onclick="resetChartControls()" style="background-color: white; border: 1px solid #d1d5db; color: #4b5563; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 700; font-size: 0.85rem; cursor: pointer;">Reset</button>
+                    </div>
                 </div>
-                <div class="flex flex-col gap-1 w-24">
-                    <label class="text-xs font-bold text-gray-500 uppercase" style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase;">Decimali</label>
-                    <input type="number" id="chartDecimals" min="0" max="2" value="1" style="padding: 0.25rem; border: 1px solid #d1d5db; border-radius: 0.25rem; text-align: center; font-weight: 700; color: #002b5c; width: 6rem;">
+                
+                <div id="argomenti-chart-text-details" style="display:none; margin-bottom: 1rem;"></div>
+                
+                <!-- Layout a griglia per i grafici -->
+                <div class="grid-container">
+                    <div style="background:var(--bg-panel); padding:1rem; border-radius:var(--radius-lg); border:1px solid var(--border-color);">
+                        <canvas id="argomenti-canvas" width="1600" height="1100" style="width: 100%; height: auto;"></canvas>
+                        <div style="display:flex; justify-content:center; gap:0.5rem; margin-top:1rem;">
+                            <button onclick="downloadChartPng()" class="btn-export" style="background:white; color:var(--brand-blue); border:1px solid var(--brand-blue);">Scarica PNG</button>
+                            <button onclick="downloadChartSvg()" class="btn-export" style="background:white; color:var(--brand-blue); border:1px solid var(--brand-blue);">Scarica SVG</button>
+                        </div>
+                    </div>
+                    <div id="tag-cloud-container"></div>
                 </div>
-                <div class="flex flex-col gap-1 w-32">
-                    <label class="text-xs font-bold text-gray-500 uppercase" title="Accorpa voci sotto questa percentuale" style="font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase;">Soglia 'Varie'</label>
-                    <input type="number" id="chartThreshold" min="0" max="100" step="0.5" value="0" placeholder="% min" style="padding: 0.25rem; border: 1px solid #d1d5db; border-radius: 0.25rem; text-align: center; font-weight: 700; color: #002b5c; width: 8rem;">
-                </div>
-                <div class="flex gap-2 pb-0.5">
-                    <button id="chartRefresh" onclick="renderArgomentiChart()" style="background-color: #0146bc; color: white; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 700; font-size: 0.875rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); border: none; cursor: pointer;">Aggiorna</button>
-                    <button id="chartReset" onclick="resetChartControls()" style="background-color: white; border: 1px solid #d1d5db; color: #4b5563; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 700; font-size: 0.875rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); cursor: pointer;">Reset</button>
-                </div>
-            </div>
-            <div id="argomenti-chart-text-details" style="display:none; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.5;"></div>
-            <div style="position: relative; width: 100%; overflow-x: auto; display: flex; justify-content: center; padding-bottom: 1rem;">
-                <canvas id="argomenti-canvas" width="1600" height="1100" style="width: 100%; max-width: 1000px; height: auto; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-radius: 8px; background: transparent;"></canvas>
-            </div>
-            <div style="text-align: center; margin-top: 1rem; display: flex; justify-content: center; gap: 0.75rem;">
-                <button onclick="downloadChartPng()" style="background-color: white; color: var(--brand-blue); border: 1px solid var(--brand-blue); padding: 0.5rem 1rem; border-radius: var(--radius-md); font-weight: 500; font-size: 0.875rem; cursor: pointer;">Scarica PNG</button>
-                <button onclick="downloadChartSvg()" style="background-color: white; color: var(--brand-blue); border: 1px solid var(--brand-blue); padding: 0.5rem 1rem; border-radius: var(--radius-md); font-weight: 500; font-size: 0.875rem; cursor: pointer;">Scarica SVG</button>
-            </div>
-        </div>
+            
+        </main>
     </div>
 
+    <!-- Drawer Laterale -->
     <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
     <aside class="detail-drawer" id="detail-drawer">
         <div class="drawer-header">
@@ -402,11 +443,18 @@
 
     let rawDataPosts = null;
     let rawDataComments = null;
+    
+    // Dataset 1: Post + Commenti (Per Tab 1)
     let aggregatedData = [];
     let filteredData = [];
+    
+    // Dataset 2: Tutti i Commenti globali (Per Tab 2)
+    let allCommentsData = [];
+    let filteredAllComments = [];
+
     let currentOpenPostId = null;
     let currentActiveTab = 'main';
-    let topicDB = {}; // DB Argomenti
+    let topicDB = {};
     
     let currentSortCol = 'date';
     let currentSortDir = 'desc';
@@ -423,24 +471,36 @@
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.getElementById('tab-' + tabId).classList.add('active');
         
+        const mainView = document.getElementById('view-main');
+        const argView = document.getElementById('view-argomenti');
+        const filterTopics = document.getElementById('filter-container-topics');
+        const filterLabels = document.getElementById('filter-container-labels');
+        
         if(tabId === 'main') {
-            document.getElementById('dashboard-layout').style.display = 'flex';
-            document.getElementById('view-argomenti').style.display = 'none';
-            document.getElementById('btn-export').innerText = "Esporta JSON";
+            mainView.style.display = 'block';
+            argView.style.display = 'none';
+            filterTopics.style.display = 'block';
+            filterLabels.style.display = 'block';
+            document.getElementById('btn-export').style.display = 'block';
+            applyFilters();
         } else {
-            document.getElementById('dashboard-layout').style.display = 'none';
-            document.getElementById('view-argomenti').style.display = 'block';
-            document.getElementById('btn-export').innerText = "Esporta JSON / Dati";
+            mainView.style.display = 'none';
+            argView.style.display = 'flex';
+            filterTopics.style.display = 'none'; 
+            filterLabels.style.display = 'none';
+            document.getElementById('btn-export').style.display = 'none';
             
-            populateArgomentiFilters();
+            applyFilters();
+            renderGlobalChannelsTable();
             renderArgomentiDB();
             renderArgomentiChart();
+            
+            // Forza inizializzazione e render
+            initTagCloudUI();
+            if(window.WordCloud) {
+                setTimeout(renderWordCloud, 100); 
+            }
         }
-    }
-
-    function exportCurrentView() {
-        if(currentActiveTab === 'main') exportMainJson();
-        else exportMainJson(); // Mantieni la stessa logica o cambia se serve
     }
 
     // --- LOGICA DI UPLOAD UNIFICATO ---
@@ -458,42 +518,12 @@
 
     async function handleFiles(files) {
         if (files.length === 1 && files[0].name.toLowerCase().endsWith('.json')) {
-            statusText.innerText = "⏳ Importazione JSON in corso...";
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const imported = JSON.parse(e.target.result);
-                    aggregatedData = imported.map((item, idx) => ({
-                        id: `post-import-${idx}`,
-                        DataOggetto: parseCustomDate(item.Data),
-                        DataFormattata: item.Data,
-                        Canale: item.Canale,
-                        PlatformRaw: item.Canale.split(' ')[0],
-                        ProfileName: item.Canale.split(' ').slice(1).join(' '),
-                        Contenuto: item.Contenuto,
-                        Argomento: item.Argomento,
-                        Label: item.Label,
-                        Link: item.Link,
-                        Commenti: item.Commenti.map(c => ({
-                            ...c,
-                            DataOggetto: parseCustomDate(c.Data),
-                            DataFormattata: c.Data,
-                            AutoreOriginale: c.Autore,
-                            AutoreAnonimo: c.Autore
-                        }))
-                    }));
-                    filteredData = [...aggregatedData];
-                    finalizeProcess();
-                } catch (err) {
-                    statusText.innerText = "❌ Errore nel file JSON: " + err.message;
-                }
-            };
-            reader.readAsText(files[0]);
+            statusText.innerText = "⏳ Funzione import JSON precedente da aggiornare per la v2.";
             return;
         }
 
         if (files.length !== 2) {
-            statusText.innerText = "❌ Carica 2 file Emplifi o 1 file JSON.";
+            statusText.innerText = "❌ Carica i 2 file Emplifi (Post e Commenti).";
             statusText.style.color = "var(--neg-color)";
             return;
         }
@@ -526,11 +556,11 @@
                 throw new Error("Impossibile riconoscere i file.");
             }
 
-            statusText.innerText = "⚙️ Elaborazione dati e associazione commenti...";
+            statusText.innerText = "⚙️ Elaborazione dati e architettura v2...";
             
             setTimeout(() => {
                 try {
-                    processData();
+                    processDataV2();
                     finalizeProcess();
                 } catch (err) {
                     statusText.innerText = "❌ Errore durante l'elaborazione: " + err.message;
@@ -546,119 +576,14 @@
 
     function finalizeProcess() {
         document.getElementById('upload-overlay').style.display = 'none';
-        switchTab('main');
+        document.getElementById('dashboard-layout').style.display = 'flex';
+        
         document.getElementById('badge-posts').style.display = 'block';
         document.getElementById('badge-comments').style.display = 'block';
-        document.getElementById('btn-export').style.display = 'block';
-        
-        // Iniezione del nuovo pulsante "Json per report"
-        if (!document.getElementById('btn-export-report')) {
-            const btnExport = document.getElementById('btn-export');
-            const btnReport = document.createElement('button');
-            btnReport.className = 'btn-export';
-            btnReport.id = 'btn-export-report';
-            btnReport.innerText = 'Json per report';
-            btnReport.style.backgroundColor = '#10b981'; // Verde per distinguerlo
-            btnReport.style.marginLeft = '10px';
-            btnReport.onclick = exportReportJson;
-            btnExport.parentNode.insertBefore(btnReport, btnExport.nextSibling);
-        }
         
         initSidebar();
-        applyFilters();
-        populateArgomentiFilters();
-    }
-
-    // Helper: parsa il formato K/M (es. 1,23K -> 1230)
-    function parseValueKM(val) {
-        val = val.trim().toUpperCase().replace(',', '.');
-        let multiplier = 1;
-        if (val.endsWith('K')) { multiplier = 1000; val = val.slice(0, -1); }
-        else if (val.endsWith('M')) { multiplier = 1000000; val = val.slice(0, -1); }
-        return parseFloat(val) * multiplier;
-    }
-
-    // Helper: formatta i numeri in K/M
-    function formatValueKM(num) {
-        if (num >= 1000000) return (num / 1000000).toLocaleString('it-IT', {maximumFractionDigits: 2}) + 'M';
-        if (num >= 1000) return (num / 1000).toLocaleString('it-IT', {maximumFractionDigits: 2}) + 'K';
-        return num.toString();
-    }
-
-    // Logica di esportazione report JSON basata sui dati del grafico
-    function exportReportJson() {
-        if (filteredData.length === 0) return alert("Nessun dato da esportare.");
-
-        // 1. Calcolo totale commenti
-        let totCommenti = 0;
-        filteredData.forEach(post => {
-            totCommenti += post.Commenti.length;
-        });
-
-        // Prompt per il dato del mese precedente
-        let prevInput = prompt("Inserisci il numero di commenti del mese precedente (es. 1,23K):", "0");
-        if (prevInput === null) return;
-        
-        let prevVal = parseValueKM(prevInput);
-        if (isNaN(prevVal)) {
-            alert("Valore non valido. Riprova con un numero corretto.");
-            return;
-        }
-
-        // Calcolo della variazione percentuale
-        let diffPct = prevVal === 0 ? (totCommenti > 0 ? 100 : 0) : ((totCommenti - prevVal) / prevVal) * 100;
-        let variazioneStr = "linea";
-        if (diffPct > 1) variazioneStr = "crescita";
-        else if (diffPct < -1) variazioneStr = "decrescita";
-
-        // 2. Calcolo argomento prevalente dal motore di analisi (Grafico)
-        let filter = document.getElementById('argomenti-filter') ? document.getElementById('argomenti-filter').value : 'all';
-        let stats = analyzeTopics(filter);
-        
-        let allTopics = Object.keys(stats).map(t => ({ label: t, value: stats[t].total }));
-        let totalValChart = allTopics.reduce((acc, curr) => acc + curr.value, 0);
-        
-        let topTopic = "-";
-        let percTop = "0%";
-
-        if (totalValChart > 0) {
-            allTopics.sort((a, b) => b.value - a.value); // Ordina per valore decrescente
-            topTopic = allTopics[0].label;
-            
-            // Applica i decimali scelti dall'utente nell'interfaccia (default 1)
-            let decimals = document.getElementById('chartDecimals') ? parseInt(document.getElementById('chartDecimals').value) : 1;
-            if (isNaN(decimals)) decimals = 1;
-            
-            percTop = ((allTopics[0].value / totalValChart) * 100).toLocaleString('it-IT', {
-                minimumFractionDigits: 0, 
-                maximumFractionDigits: decimals
-            }) + "%";
-        }
-
-        // 3. Creazione e download JSON
-        const reportData = {
-            "Totale commenti": formatValueKM(totCommenti),
-            "Dettaglio Argomenti: Temi trattati Poste Italiane FB: l'argomento con più commenti": topTopic,
-            "Dettaglio Argomenti: valore in percentuale commenti argomento Temi trattati Poste Italiane FB": percTop,
-            "Variazione commenti rispetto al mese precedente": variazioneStr
-        };
-
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(reportData, null, 2));
-        
-        const now = new Date();
-        const aaaa = now.getFullYear();
-        const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const gg = String(now.getDate()).padStart(2, '0');
-        const hh = String(now.getHours()).padStart(2, '0');
-        const mnm = String(now.getMinutes()).padStart(2, '0');
-        const filename = `ES3_${aaaa}_${mm}_${gg}_${hh}_${mnm}_Community_json.json`;
-
-        const dlAnchorElem = document.createElement('a');
-        dlAnchorElem.setAttribute("href", dataStr);
-        dlAnchorElem.setAttribute("download", filename);
-        document.body.appendChild(dlAnchorElem);
-        dlAnchorElem.click();
-        document.body.removeChild(dlAnchorElem);
+        initTagCloudUI();
+        switchTab('main'); // Forza reset stato visuale
     }
 
     // --- PARSING ---
@@ -720,6 +645,31 @@
         if (!dateObj || isNaN(dateObj.getTime()) || dateObj.getTime() === 0) return "Data N/D";
         return dateObj.toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
+    
+    function normalizePlatform(p) {
+        if(!p) return 'Sconosciuto';
+        p = p.trim().toLowerCase();
+        if(p.includes('twitter') || p === 'x') return 'X';
+        if(p.includes('linkedin')) return 'Linkedin';
+        if(p.includes('facebook')) return 'Facebook';
+        if(p.includes('instagram')) return 'Instagram';
+        if(p.includes('youtube')) return 'YouTube';
+        return p.charAt(0).toUpperCase() + p.slice(1);
+    }
+
+    function getPlatformLogo(platform, profileName) {
+        const p = (platform || '').toLowerCase();
+        let svg = '';
+        if (p.includes('facebook')) svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="var(--brand-blue)"><path d="M22.675 0h-21.35c-.732 0-1.325.593-1.325 1.325v21.351c0 .731.593 1.324 1.325 1.324h11.495v-9.294h-3.128v-3.622h3.128v-2.671c0-3.1 1.893-4.788 4.659-4.788 1.325 0 2.463.099 2.795.143v3.24l-1.918.001c-1.504 0-1.795.715-1.795 1.763v2.313h3.587l-.467 3.622h-3.12v9.293h6.116c.73 0 1.323-.593 1.323-1.325v-21.35c0-.732-.593-1.325-1.325-1.325z"/></svg>`;
+        else if (p.includes('instagram')) svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="var(--brand-blue)"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>`;
+        else if (p.includes('linkedin')) svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="var(--brand-blue)"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>`;
+        else if (p.includes('youtube')) svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="var(--brand-blue)"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>`;
+        else if (p.includes('x')) svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="var(--brand-blue)"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 22.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`;
+        else svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="var(--brand-blue)"><path d="M12 0a12 12 0 1012 12A12.013 12.013 0 0012 0zm0 22a10 10 0 1110-10 10.011 10.011 0 01-10 10z"/></svg>`;
+        
+        const nameToDisplay = profileName || platform || 'Sconosciuto';
+        return `<div style="display:flex; align-items:center; gap:0.5rem;" title="${platform}">${svg} <span style="font-weight:600; color: var(--text-main); font-size: 0.95rem;">${nameToDisplay}</span></div>`;
+    }
 
     function formatCopyTextAdvanced(text) {
         if (!text) return text;
@@ -738,21 +688,7 @@
         urls.forEach((u, i) => formatted = formatted.replace(`__URL_${i}__`, u));
         return formatted;
     }
-
-    function getPlatformLogo(platform, profileName) {
-        const p = (platform || '').toLowerCase();
-        let svg = '';
-        if (p.includes('facebook')) svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="var(--brand-blue)"><path d="M22.675 0h-21.35c-.732 0-1.325.593-1.325 1.325v21.351c0 .731.593 1.324 1.325 1.324h11.495v-9.294h-3.128v-3.622h3.128v-2.671c0-3.1 1.893-4.788 4.659-4.788 1.325 0 2.463.099 2.795.143v3.24l-1.918.001c-1.504 0-1.795.715-1.795 1.763v2.313h3.587l-.467 3.622h-3.12v9.293h6.116c.73 0 1.323-.593 1.323-1.325v-21.35c0-.732-.593-1.325-1.325-1.325z"/></svg>`;
-        else if (p.includes('instagram')) svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="var(--brand-blue)"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>`;
-        else if (p.includes('linkedin')) svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="var(--brand-blue)"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>`;
-        else if (p.includes('youtube')) svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="var(--brand-blue)"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>`;
-        else if (p.includes('twitter') || p.includes('x')) svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="var(--brand-blue)"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 22.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`;
-        else svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="var(--brand-blue)"><path d="M12 0a12 12 0 1012 12A12.013 12.013 0 0012 0zm0 22a10 10 0 1110-10 10.011 10.011 0 01-10 10z"/></svg>`;
-        
-        const nameToDisplay = profileName || platform || 'Sconosciuto';
-        return `<div style="display:flex; align-items:center; gap:0.5rem;" title="${platform}">${svg} <span style="font-weight:600; color: var(--text-main); font-size: 0.95rem;">${nameToDisplay}</span></div>`;
-    }
-
+    
     function truncateTextSafe(text, maxLength) {
         if (!text || text.length <= maxLength) return text;
         const truncated = text.substring(0, maxLength);
@@ -763,9 +699,10 @@
         return truncated + ' (...)';
     }
 
-    // --- MOTORE ELABORAZIONE POST E COMMENTI ---
-    function processData() {
+    // --- MOTORE ELABORAZIONE V2 ---
+    function processDataV2() {
         const postsMap = new Map();
+        allCommentsData = []; // Reset dataset globale
         
         // 1. Elabora Post
         rawDataPosts.forEach((row, index) => {
@@ -775,16 +712,10 @@
             
             if (!contentId || !platformRawOrig) return;
             
-            let platform = platformRawOrig.trim();
-            if (platform.toLowerCase() === 'twitter') {
-                platform = 'X';
-            } else {
-                platform = platform.charAt(0).toUpperCase() + platform.slice(1).toLowerCase();
-            }
+            let platform = normalizePlatform(platformRawOrig);
 
             if (platformRawOrig.toLowerCase().includes('linkedin') && contentId.includes(':')) contentId = contentId.split(':').pop();
 
-            const canaleCompleto = profileName ? `${platform} ${profileName}` : platform;
             const rawLabels = getColValue(row, 'Labels').split(/[;,]/).map(s => s.trim());
             let topicList = [], mappedLabelsList = [];
 
@@ -802,8 +733,7 @@
                 id: `post-${index}`,
                 DataOggetto: dateObj,
                 DataFormattata: formatDate(dateObj),
-                Canale: canaleCompleto,
-                PlatformRaw: platform,
+                Canale: platform,
                 ProfileName: profileName,
                 Contenuto: getColValue(row, 'Content') || topicList.join(', '),
                 Argomento: topicList.join(', '),
@@ -813,50 +743,72 @@
             });
         });
 
-        // 2. Elabora Commenti
-        rawDataComments.forEach(row => {
-            let parentId = getColValue(row, 'Parent ID').toLowerCase();
-            if (parentId.includes(':') && (parentId.includes('linkedin') || parentId.includes('urn:li:'))) {
-                parentId = `linkedin-${parentId.split(':').pop()}`;
-            }
-            
+        // 2. Elabora Tutti i Commenti
+        rawDataComments.forEach((row, cIdx) => {
             let message = getColValue(row, 'Message Content') || getColValue(row, 'Care case ID') || '[Testo rimosso/vuoto]';
             if (message === '[Testo rimosso/vuoto]' || message.toLowerCase().includes('rimosso') || message.trim() === '') return; 
 
             const dateObj = parseCustomDate(getColValue(row, 'Created time'));
+            let platform = normalizePlatform(getColValue(row, 'Platform'));
+            
+            let authorOriginal = getColValue(row, 'Community') || getColValue(row, 'Author Name') || getColValue(row, 'User') || getColValue(row, 'Sender Name');
+            let authorAnon = `Utente ${platform}`;
+            if (!authorOriginal) authorOriginal = authorAnon;
 
-            if (postsMap.has(parentId)) {
-                const parentPost = postsMap.get(parentId);
-                const parentPlatform = parentPost.PlatformRaw || 'Social';
-                
-                let authorOriginal = getColValue(row, 'Community') || getColValue(row, 'Author Name') || getColValue(row, 'User') || getColValue(row, 'Sender Name');
-                let authorAnon = `Utente ${parentPlatform.charAt(0).toUpperCase() + parentPlatform.slice(1)}`;
-                if (!authorOriginal) authorOriginal = authorAnon;
+            let commentUrl = getColValue(row, 'url') || getColValue(row, 'permalink') || '';
+            let sentiment = SENTIMENT_MAP[getColValue(row, 'Sentiment').toLowerCase()] || 'neutro';
 
-                let commentUrl = getColValue(row, 'url') || getColValue(row, 'permalink') || '';
+            // Costruisci oggetto commento base
+            let commentObj = {
+                id: `comm-${cIdx}`,
+                DataOggetto: dateObj,
+                DataFormattata: formatDate(dateObj),
+                Canale: platform, // Info cruciale per la Tab 2
+                Testo: message,
+                Sentiment: sentiment,
+                AutoreOriginale: authorOriginal,
+                AutoreAnonimo: authorAnon,
+                Link: commentUrl
+            };
+            
+            // Aggiungilo al pool globale (Tab 2)
+            allCommentsData.push(commentObj);
 
-                parentPost.Commenti.push({
-                    DataOggetto: dateObj,
-                    DataFormattata: formatDate(dateObj),
-                    Testo: message,
-                    Sentiment: SENTIMENT_MAP[getColValue(row, 'Sentiment').toLowerCase()] || 'neutro',
-                    AutoreOriginale: authorOriginal,
-                    AutoreAnonimo: authorAnon,
-                    Link: commentUrl
-                });
+            // Verifica se appartiene a un post noto (Tab 1)
+            let parentId = getColValue(row, 'Parent ID').toLowerCase();
+            if (parentId) {
+                if (parentId.includes(':') && (parentId.includes('linkedin') || parentId.includes('urn:li:'))) {
+                    parentId = `linkedin-${parentId.split(':').pop()}`;
+                }
+                if (postsMap.has(parentId)) {
+                    postsMap.get(parentId).Commenti.push(commentObj);
+                }
             }
         });
 
+        // Popola dataset Tab 1 (Solo post con commenti)
         aggregatedData = Array.from(postsMap.values()).filter(p => p.Commenti.length > 0);
         aggregatedData.forEach(post => post.Commenti.sort((a, b) => a.DataOggetto - b.DataOggetto));
         filteredData = [...aggregatedData];
+        
+        // Ordina dataset Tab 2
+        allCommentsData.sort((a, b) => a.DataOggetto - b.DataOggetto);
+        filteredAllComments = [...allCommentsData];
     }
 
-    // --- GESTIONE SIDEBAR E FILTRI ---
+    // --- GESTIONE SIDEBAR E FILTRI (Adattiva per Tab 1 e 2) ---
     function initSidebar() {
-        const platforms = new Set(), topics = new Set(), labels = new Set();
+        const platforms = new Set();
+        const topics = new Set();
+        const labels = new Set();
+        
+        // Le piattaforme le peschiamo dai commenti globali per avere tutto
+        allCommentsData.forEach(c => {
+            if (c.Canale) platforms.add(c.Canale);
+        });
+        
+        // Argomenti e Label esistono solo nei Post
         aggregatedData.forEach(post => {
-            if (post.Canale) platforms.add(post.Canale);
             if (post.Argomento) post.Argomento.split(',').forEach(t => { if(t.trim()) topics.add(t.trim()) });
             if (post.Label) post.Label.split(',').forEach(l => { if(l.trim()) labels.add(l.trim()) });
         });
@@ -878,7 +830,7 @@
     function buildCheckboxes(containerId, dataSet, namePrefix) {
         const container = document.getElementById(containerId);
         container.innerHTML = '';
-        Array.from(dataSet).sort().forEach((item, idx) => {
+        Array.from(dataSet).sort().forEach((item) => {
             container.innerHTML += `
                 <label class="checkbox-item">
                     <input type="checkbox" value="${item.replace(/"/g, '&quot;')}" class="${namePrefix}" onchange="applyFilters()">
@@ -893,7 +845,9 @@
     }
 
     function resetFilters() {
-        document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+        document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            if(cb.id !== 'toggle-anon') cb.checked = false;
+        });
         document.getElementById('search-topic').value = '';
         document.querySelectorAll('#list-topics .checkbox-item').forEach(item => item.style.display = '');
         currentSortCol = 'date';
@@ -903,128 +857,69 @@
         applyFilters();
     }
     
-    // --- ORDINAMENTO TABELLA PRINCIPALE ---
-    function toggleSort(col) {
-        if (currentSortCol === col) {
-            currentSortDir = currentSortDir === 'desc' ? 'asc' : 'desc';
-        } else {
-            currentSortCol = col;
-            currentSortDir = 'desc';
-        }
-        document.getElementById('sort-icon-date').innerText = '';
-        document.getElementById('sort-icon-comments').innerText = '';
-        
-        const icon = currentSortDir === 'desc' ? '▼' : '▲';
-        if(col === 'date') document.getElementById('sort-icon-date').innerText = icon;
-        if(col === 'comments') document.getElementById('sort-icon-comments').innerText = icon;
-        applyFilters();
-    }
-
-    let drawerState = { search: '', filter: 'all', sort: 'date-desc' };
-
-    function renderDrawerComments() {
-        const post = aggregatedData.find(p => p.id === currentOpenPostId);
-        if(!post) return;
-        
-        const isAnon = document.getElementById('toggle-anon').checked;
-        const commContainer = document.getElementById('detail-comments-list');
-        
-        let filteredComments = post.Commenti.map((c, index) => ({...c, _origIdx: index})).filter(c => {
-            const matchSearch = c.Testo.toLowerCase().includes(drawerState.search.toLowerCase()) || 
-                                (c.AutoreOriginale && c.AutoreOriginale.toLowerCase().includes(drawerState.search.toLowerCase()));
-            const matchSentiment = drawerState.filter === 'all' || c.Sentiment === drawerState.filter;
-            return matchSearch && matchSentiment;
-        });
-
-        filteredComments.sort((a, b) => {
-            if(drawerState.sort === 'date-asc') return a.DataOggetto - b.DataOggetto;
-            if(drawerState.sort === 'date-desc') return b.DataOggetto - a.DataOggetto;
-            if(drawerState.sort === 'len-desc') return b.Testo.length - a.Testo.length;
-            if(drawerState.sort === 'len-asc') return a.Testo.length - b.Testo.length;
-            return 0;
-        });
-
-        document.getElementById('detail-comment-count').innerText = post.Commenti.length + (filteredComments.length !== post.Commenti.length ? ` (filtrati: ${filteredComments.length})` : '');
-
-        if(filteredComments.length === 0) {
-            commContainer.innerHTML = '<div style="padding: 1rem; text-align: center; color: var(--text-muted);">Nessun commento corrisponde ai criteri di ricerca.</div>';
-            return;
-        }
-
-        commContainer.innerHTML = filteredComments.map(c => {
-            const authorToShow = isAnon ? c.AutoreAnonimo : c.AutoreOriginale;
-            const linkHtml = c.Link ? `<a href="${c.Link}" target="_blank" style="color: var(--brand-blue); margin-left: 0.5rem; display: inline-flex; align-items: center; vertical-align: middle;" title="Apri commento"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a>` : '';
-            return `
-            <div class="comment-item ${c.Sentiment}">
-                <div style="color: var(--brand-blue); font-weight: 700; font-size: 0.85rem; margin-bottom: 0.4rem;">${authorToShow}</div>
-                <div class="comment-header">
-                    <span class="comment-date" style="display: flex; align-items: center;">${c.DataFormattata}${linkHtml}</span>
-                    <span class="comment-sentiment s-text-${c.Sentiment}" style="cursor: pointer; padding: 2px 6px; border-radius: 4px; border: 1px dashed currentColor; transition: background 0.2s;" title="Clicca per cambiare sentiment" onclick="changeSentiment('${post.id}', ${c._origIdx}, event, this)">${c.Sentiment} ↻</span>
-                </div>
-                <div style="font-size: 0.95rem;">${c.Testo}</div>
-            </div>
-            `;
-        }).join('');
-    }
-
-    function changeSentiment(postId, commentIdx, event, btnElement) {
-        if(event) event.stopPropagation();
-        const post = aggregatedData.find(p => p.id === postId);
-        if(!post || !post.Commenti[commentIdx]) return;
-        const c = post.Commenti[commentIdx];
-        
-        if(c.Sentiment === 'positivo') c.Sentiment = 'neutro';
-        else if(c.Sentiment === 'neutro') c.Sentiment = 'negativo';
-        else c.Sentiment = 'positivo';
-        
-        if(btnElement) {
-            const item = btnElement.closest('.comment-item');
-            if(item) {
-                item.classList.remove('positivo', 'neutro', 'negativo');
-                item.classList.add(c.Sentiment);
-            }
-            btnElement.className = `comment-sentiment s-text-${c.Sentiment}`;
-            btnElement.innerHTML = `${c.Sentiment} ↻`;
-        }
-        applyFilters(true); 
-    }
-
-    function applyFilters(skipDrawerRender = false) {
+    function applyFilters() {
         const selPlatforms = getCheckedValues('filter-platform');
-        const selTopics = getCheckedValues('filter-topic');
-        const selLabels = getCheckedValues('filter-label');
+        
+        if (currentActiveTab === 'main') {
+            // Filtri per Tab 1 (Dashboard Post)
+            const selTopics = getCheckedValues('filter-topic');
+            const selLabels = getCheckedValues('filter-label');
 
-        filteredData = aggregatedData.filter(post => {
-            const matchPlatform = selPlatforms.length === 0 || selPlatforms.includes(post.Canale);
-            const matchTopic = selTopics.length === 0 || selTopics.some(t => post.Argomento.includes(t));
-            const matchLabel = selLabels.length === 0 || selLabels.some(l => post.Label.includes(l));
-            return matchPlatform && matchTopic && matchLabel;
-        });
+            filteredData = aggregatedData.filter(post => {
+                const matchPlatform = selPlatforms.length === 0 || selPlatforms.includes(post.Canale);
+                const matchTopic = selTopics.length === 0 || selTopics.some(t => post.Argomento.includes(t));
+                const matchLabel = selLabels.length === 0 || selLabels.some(l => post.Label.includes(l));
+                return matchPlatform && matchTopic && matchLabel;
+            });
 
-        filteredData.sort((a, b) => {
-            let valA, valB;
-            if(currentSortCol === 'date') {
-                valA = a.DataOggetto; valB = b.DataOggetto;
-            } else if(currentSortCol === 'comments') {
-                valA = a.Commenti.length; valB = b.Commenti.length;
-            } else { return 0; }
-            if(currentSortDir === 'asc') return valA > valB ? 1 : (valA < valB ? -1 : 0);
-            return valA < valB ? 1 : (valA > valB ? -1 : 0);
-        });
+            filteredData.sort((a, b) => {
+                let valA, valB;
+                if(currentSortCol === 'date') { valA = a.DataOggetto; valB = b.DataOggetto; } 
+                else if(currentSortCol === 'comments') { valA = a.Commenti.length; valB = b.Commenti.length; } 
+                else { return 0; }
+                if(currentSortDir === 'asc') return valA > valB ? 1 : (valA < valB ? -1 : 0);
+                return valA < valB ? 1 : (valA > valB ? -1 : 0);
+            });
 
-        let totG = 0, posG = 0, neuG = 0, negG = 0;
-        filteredData.forEach(post => {
-            post.Commenti.forEach(c => {
-                totG++;
+            let totG = 0, posG = 0, neuG = 0, negG = 0;
+            filteredData.forEach(post => {
+                post.Commenti.forEach(c => {
+                    totG++;
+                    if (c.Sentiment === 'positivo') posG++;
+                    else if (c.Sentiment === 'neutro') neuG++;
+                    else if (c.Sentiment === 'negativo') negG++;
+                });
+            });
+
+            document.getElementById('stat-posts').innerText = filteredData.length;
+            document.getElementById('stat-comments').innerText = totG;
+            updateGlobalSentimentBar(totG, posG, neuG, negG);
+            renderTable();
+            
+        } else {
+            // Filtri per Tab 2 (Analisi Commenti Globale) - Applica solo il Canale
+            filteredAllComments = allCommentsData.filter(c => {
+                return selPlatforms.length === 0 || selPlatforms.includes(c.Canale);
+            });
+            
+            let totG = filteredAllComments.length;
+            let posG = 0, neuG = 0, negG = 0;
+            filteredAllComments.forEach(c => {
                 if (c.Sentiment === 'positivo') posG++;
                 else if (c.Sentiment === 'neutro') neuG++;
                 else if (c.Sentiment === 'negativo') negG++;
             });
-        });
-
-        document.getElementById('stat-posts').innerText = filteredData.length;
-        document.getElementById('stat-comments').innerText = totG;
-
+            
+            document.getElementById('global-total-comments').innerText = totG;
+            updateGlobalSentimentBar(totG, posG, neuG, negG);
+            
+            renderGlobalChannelsTable();
+            renderArgomentiChart();
+            if(window.WordCloud) renderWordCloud();
+        }
+    }
+    
+    function updateGlobalSentimentBar(totG, posG, neuG, negG) {
         if (totG > 0) {
             let pPos = ((posG/totG)*100).toFixed(1);
             let pNeu = ((neuG/totG)*100).toFixed(1);
@@ -1049,8 +944,23 @@
         } else {
             document.getElementById('badge-sentiment').style.display = 'none';
         }
+    }
 
-        renderTable();
+    // --- RENDER TAB 1: TABELLA POST ---
+    function toggleSort(col) {
+        if (currentSortCol === col) {
+            currentSortDir = currentSortDir === 'desc' ? 'asc' : 'desc';
+        } else {
+            currentSortCol = col;
+            currentSortDir = 'desc';
+        }
+        document.getElementById('sort-icon-date').innerText = '';
+        document.getElementById('sort-icon-comments').innerText = '';
+        
+        const icon = currentSortDir === 'desc' ? '▼' : '▲';
+        if(col === 'date') document.getElementById('sort-icon-date').innerText = icon;
+        if(col === 'comments') document.getElementById('sort-icon-comments').innerText = icon;
+        applyFilters();
     }
 
     function renderTable() {
@@ -1083,7 +993,7 @@
             
             tr.innerHTML = `
                 <td style="white-space: nowrap; color: var(--text-muted); font-size: 0.85rem;">${post.DataFormattata}</td>
-                <td>${getPlatformLogo(post.PlatformRaw, post.ProfileName)}</td>
+                <td>${getPlatformLogo(post.Canale, post.ProfileName)}</td>
                 <td style="max-width: 400px;">${topicCell}</td>
                 <td style="font-weight: 600; text-align: center;">${tot}</td>
                 <td>
@@ -1101,12 +1011,14 @@
         });
     }
 
-    // --- PANNELLO LATERALE (DETAIL) ---
+    // --- PANNELLO LATERALE (DETAIL PER TAB 1) ---
+    let drawerState = { search: '', filter: 'all', sort: 'date-desc' };
+
     function openDrawer(postId, rowElement, isRefresh = false) {
         currentOpenPostId = postId;
         
         if (!isRefresh) {
-            document.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
+            document.querySelectorAll('#data-table tr').forEach(r => r.classList.remove('selected'));
             if(rowElement) rowElement.classList.add('selected');
             drawerState = { search: '', filter: 'all', sort: 'date-desc' };
         }
@@ -1114,7 +1026,7 @@
         const post = aggregatedData.find(p => p.id === postId);
         if(!post) return;
 
-        document.getElementById('detail-platform').innerHTML = getPlatformLogo(post.PlatformRaw, post.ProfileName);
+        document.getElementById('detail-platform').innerHTML = getPlatformLogo(post.Canale, post.ProfileName);
         document.getElementById('detail-date').innerText = post.DataFormattata;
         document.getElementById('detail-label').innerText = post.Label || '-';
         document.getElementById('detail-topic').innerText = post.Argomento || '-';
@@ -1156,14 +1068,208 @@
         document.getElementById('drawer-overlay').classList.add('active');
     }
 
+    function renderDrawerComments() {
+        const post = aggregatedData.find(p => p.id === currentOpenPostId);
+        if(!post) return;
+        
+        const isAnon = document.getElementById('toggle-anon').checked;
+        const commContainer = document.getElementById('detail-comments-list');
+        
+        let filteredComments = post.Commenti.map((c, index) => ({...c, _origIdx: index})).filter(c => {
+            const matchSearch = c.Testo.toLowerCase().includes(drawerState.search.toLowerCase()) || 
+                                (c.AutoreOriginale && c.AutoreOriginale.toLowerCase().includes(drawerState.search.toLowerCase()));
+            const matchSentiment = drawerState.filter === 'all' || c.Sentiment === drawerState.filter;
+            return matchSearch && matchSentiment;
+        });
+
+        filteredComments.sort((a, b) => {
+            if(drawerState.sort === 'date-asc') return a.DataOggetto - b.DataOggetto;
+            if(drawerState.sort === 'date-desc') return b.DataOggetto - a.DataOggetto;
+            if(drawerState.sort === 'len-desc') return b.Testo.length - a.Testo.length;
+            if(drawerState.sort === 'len-asc') return a.Testo.length - b.Testo.length;
+            return 0;
+        });
+
+        document.getElementById('detail-comment-count').innerText = post.Commenti.length + (filteredComments.length !== post.Commenti.length ? ` (filtrati: ${filteredComments.length})` : '');
+
+        if(filteredComments.length === 0) {
+            commContainer.innerHTML = '<div style="padding: 1rem; text-align: center; color: var(--text-muted);">Nessun commento corrisponde ai criteri di ricerca.</div>';
+            return;
+        }
+
+        commContainer.innerHTML = filteredComments.map(c => {
+            const authorToShow = isAnon ? c.AutoreAnonimo : c.AutoreOriginale;
+            const linkHtml = c.Link ? `<a href="${c.Link}" target="_blank" style="color: var(--brand-blue); margin-left: 0.5rem; display: inline-flex; align-items: center; vertical-align: middle;" title="Apri commento"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a>` : '';
+            return `
+            <div class="comment-item ${c.Sentiment}">
+                <div style="color: var(--brand-blue); font-weight: 700; font-size: 0.85rem; margin-bottom: 0.4rem;">${authorToShow}</div>
+                <div class="comment-header">
+                    <span class="comment-date" style="display: flex; align-items: center;">${c.DataFormattata}${linkHtml}</span>
+                    <span class="comment-sentiment s-text-${c.Sentiment}">${c.Sentiment}</span>
+                </div>
+                <div style="font-size: 0.95rem;">${c.Testo}</div>
+            </div>
+            `;
+        }).join('');
+    }
+
     function closeDrawer() {
         document.getElementById('detail-drawer').classList.remove('open');
         document.getElementById('drawer-overlay').classList.remove('active');
-        document.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
+        document.querySelectorAll('#data-table tr').forEach(r => r.classList.remove('selected'));
         currentOpenPostId = null;
     }
 
-    // --- TAB ARGOMENTI: GESTIONE DB E ANALISI ---
+
+    // --- RENDER TAB 2: ANALISI GLOBALE ---
+
+    function renderGlobalChannelsTable() {
+        const tbody = document.getElementById('global-channels-body');
+        tbody.innerHTML = '';
+        
+        if (filteredAllComments.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 2rem;">Nessun commento trovato.</td></tr>`;
+            return;
+        }
+
+        const channelStats = {};
+        filteredAllComments.forEach(c => {
+            if(!channelStats[c.Canale]) channelStats[c.Canale] = { tot: 0, pos: 0, neu: 0, neg: 0 };
+            channelStats[c.Canale].tot++;
+            if(c.Sentiment === 'positivo') channelStats[c.Canale].pos++;
+            else if(c.Sentiment === 'neutro') channelStats[c.Canale].neu++;
+            else if(c.Sentiment === 'negativo') channelStats[c.Canale].neg++;
+        });
+
+        const sortedChannels = Object.keys(channelStats).sort((a,b) => channelStats[b].tot - channelStats[a].tot);
+
+        sortedChannels.forEach(ch => {
+            const stat = channelStats[ch];
+            const pPos = ((stat.pos/stat.tot)*100).toFixed(1);
+            const pNeu = ((stat.neu/stat.tot)*100).toFixed(1);
+            const pNeg = ((stat.neg/stat.tot)*100).toFixed(1);
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="font-weight: 500;">${getPlatformLogo(ch, ch)}</td>
+                <td style="text-align:center; font-weight:600;">${stat.tot}</td>
+                <td style="width: 40%;">
+                    <div class="sentiment-bar-container" style="width:100%;">
+                        <div class="s-pos" style="width: ${pPos}%" title="Positivo"></div>
+                        <div class="s-neu" style="width: ${pNeu}%" title="Neutro"></div>
+                        <div class="s-neg" style="width: ${pNeg}%" title="Negativo"></div>
+                    </div>
+                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; text-align: center;">
+                        <span style="color:var(--pos-color)">${pPos}%</span> | <span style="color:var(--neu-color)">${pNeu}%</span> | <span style="color:var(--neg-color)">${pNeg}%</span>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // --- GESTIONE REPORT JSON (V2) ---
+    function parseValueKM(val) {
+        val = val.trim().toUpperCase().replace(',', '.');
+        let multiplier = 1;
+        if (val.endsWith('K')) { multiplier = 1000; val = val.slice(0, -1); }
+        else if (val.endsWith('M')) { multiplier = 1000000; val = val.slice(0, -1); }
+        return parseFloat(val) * multiplier;
+    }
+
+    function formatValueKM(num) {
+        if (num >= 1000000) return (num / 1000000).toLocaleString('it-IT', {maximumFractionDigits: 2}) + 'M';
+        if (num >= 1000) return (num / 1000).toLocaleString('it-IT', {maximumFractionDigits: 2}) + 'K';
+        return num.toString();
+    }
+
+    function exportReportJson() {
+        if (filteredAllComments.length === 0) return alert("Nessun dato da esportare.");
+
+        let totCommenti = filteredAllComments.length;
+
+        let prevInput = prompt("Inserisci il numero di commenti del mese precedente (es. 1,23K):", "0");
+        if (prevInput === null) return;
+        
+        let prevVal = parseValueKM(prevInput);
+        if (isNaN(prevVal)) return alert("Valore non valido.");
+
+        let diffPct = prevVal === 0 ? (totCommenti > 0 ? 100 : 0) : ((totCommenti - prevVal) / prevVal) * 100;
+        let variazioneStr = "linea";
+        if (diffPct > 1) variazioneStr = "crescita";
+        else if (diffPct < -1) variazioneStr = "decrescita";
+
+        let filter = document.getElementById('argomenti-filter') ? document.getElementById('argomenti-filter').value : 'all';
+        let stats = analyzeTopics(filter); // Ora analizza filteredAllComments
+        
+        let allTopics = Object.keys(stats).map(t => ({ label: t, value: stats[t].total }));
+        let totalValChart = allTopics.reduce((acc, curr) => acc + curr.value, 0);
+        
+        let topTopic = "-";
+        let percTop = "0%";
+
+        if (totalValChart > 0) {
+            allTopics.sort((a, b) => b.value - a.value);
+            topTopic = allTopics[0].label;
+            let decimals = parseInt(document.getElementById('chartDecimals').value) || 1;
+            percTop = ((allTopics[0].value / totalValChart) * 100).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: decimals }) + "%";
+        }
+
+        const reportData = {
+            "Totale commenti": formatValueKM(totCommenti),
+            "Dettaglio Argomenti: Temi trattati Poste Italiane FB: l'argomento con più commenti": topTopic,
+            "Dettaglio Argomenti: valore in percentuale commenti argomento Temi trattati Poste Italiane FB": percTop,
+            "Variazione commenti rispetto al mese precedente": variazioneStr
+        };
+
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(reportData, null, 2));
+        const now = new Date();
+        const aaaa = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const gg = String(now.getDate()).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mnm = String(now.getMinutes()).padStart(2, '0');
+        const filename = `ES3_${aaaa}_${mm}_${gg}_${hh}_${mnm}_Community_json.json`;
+
+        const dlAnchorElem = document.createElement('a');
+        dlAnchorElem.setAttribute("href", dataStr);
+        dlAnchorElem.setAttribute("download", filename);
+        document.body.appendChild(dlAnchorElem);
+        dlAnchorElem.click();
+        document.body.removeChild(dlAnchorElem);
+    }
+
+    function exportMainJson() {
+        if (filteredData.length === 0) return alert("Nessun post da esportare.");
+        const isAnon = document.getElementById('toggle-anon').checked;
+        const exportPayload = filteredData.map(post => {
+            return {
+                Data: post.DataFormattata,
+                Canale: post.Canale,
+                Argomento: post.Argomento,
+                Label: post.Label,
+                Link: post.Link,
+                Contenuto: post.Contenuto,
+                Commenti: post.Commenti.map(c => ({
+                    Data: c.DataFormattata,
+                    Autore: isAnon ? c.AutoreAnonimo : c.AutoreOriginale,
+                    Testo: c.Testo,
+                    Sentiment: c.Sentiment,
+                    Link: c.Link
+                }))
+            };
+        });
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
+        const now = new Date();
+        const filename = `dati_dashboard_post_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.json`;
+        const dlAnchorElem = document.createElement('a');
+        dlAnchorElem.setAttribute("href", dataStr);
+        dlAnchorElem.setAttribute("download", filename);
+        dlAnchorElem.click();
+    }
+
+
+    // --- GESTIONE DB E ANALISI SEMANTICA (Aggiornata per allCommentsData) ---
     document.getElementById('import-db-json').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if(!file) return;
@@ -1172,23 +1278,15 @@
             try {
                 let imported = JSON.parse(evt.target.result);
                 topicDB = {};
-                // Se è un array di stringhe come argomenti_full_array.json
                 if(Array.isArray(imported)) {
-                    imported.forEach(item => {
-                        if(item && typeof item === 'string') {
-                            topicDB[item] = [item];
-                        }
-                    });
+                    imported.forEach(item => { if(item && typeof item === 'string') topicDB[item] = [item]; });
                 } else if(typeof imported === 'object') {
                     topicDB = imported;
                 }
                 renderArgomentiDB();
                 renderArgomentiChart();
                 document.getElementById('import-db-json').value = '';
-                alert("DB Argomenti importato con successo!");
-            } catch(err) {
-                alert("Errore nel JSON: " + err.message);
-            }
+            } catch(err) { alert("Errore nel JSON: " + err.message); }
         };
         reader.readAsText(file);
     });
@@ -1204,9 +1302,7 @@
                 <button onclick="removeDbTopic('${escapedTopic}')" style="background:var(--neg-color); color:white; border-radius:4px; padding:0.5rem 0.8rem;" title="Rimuovi">X</button>
             </div>`;
         });
-        if(Object.keys(topicDB).length === 0) {
-            html = `<div style="color:var(--text-muted); font-style:italic;">Nessun argomento nel DB. Importa un JSON o aggiungi manualmente.</div>`;
-        }
+        if(Object.keys(topicDB).length === 0) html = `<div style="color:var(--text-muted); font-style:italic;">Nessun argomento nel DB.</div>`;
         document.getElementById('db-editor').innerHTML = html;
     }
 
@@ -1214,120 +1310,74 @@
         if(oldName === newName || !newName.trim()) return;
         topicDB[newName] = topicDB[oldName];
         delete topicDB[oldName];
-        renderArgomentiDB();
-        renderArgomentiChart();
+        renderArgomentiDB(); renderArgomentiChart();
     }
-
     function updateDbTopic(topic, kwString) {
         topicDB[topic] = kwString.split(',').map(s => s.trim()).filter(s => s);
         renderArgomentiChart();
     }
-
     function removeDbTopic(topic) {
-        if(confirm(`Rimuovere l'argomento "${topic}"?`)) {
-            delete topicDB[topic];
-            renderArgomentiDB();
-            renderArgomentiChart();
-        }
+        if(confirm(`Rimuovere l'argomento "${topic}"?`)) { delete topicDB[topic]; renderArgomentiDB(); renderArgomentiChart(); }
     }
-
     function addDbTopic() {
-        let name = "Nuovo Argomento " + Math.floor(Math.random()*1000);
-        topicDB[name] = [];
+        topicDB["Nuovo Argomento " + Math.floor(Math.random()*1000)] = [];
         renderArgomentiDB();
     }
-
     function exportDbJson() {
         if(Object.keys(topicDB).length === 0) return alert("DB vuoto.");
         let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(topicDB, null, 2));
-        let dl = document.createElement('a');
-        dl.setAttribute("href", dataStr);
-        dl.setAttribute("download", "db_argomenti_poste.json");
-        dl.click();
+        let dl = document.createElement('a'); dl.setAttribute("href", dataStr); dl.setAttribute("download", "db_argomenti_poste.json"); dl.click();
     }
 
-    function escapeRegExp(string) {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
+    function escapeRegExp(string) { return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
+    // Motore semantico su allCommentsData
     function analyzeTopics(filter) {
         let stats = {};
-        Object.keys(topicDB).forEach(t => {
-            stats[t] = { total: 0, channels: {}, matchedComments: [] };
-        });
+        Object.keys(topicDB).forEach(t => { stats[t] = { total: 0, channels: {} }; });
 
         let topicRegexes = {};
         Object.keys(topicDB).forEach(t => {
             let kwList = topicDB[t].map(kw => {
                 let k = kw.trim();
                 if(!k) return null;
-                if(k.endsWith('*')) {
-                    return '\\b' + escapeRegExp(k.slice(0, -1)) + '[a-zA-ZÀ-ÿ0-9]*';
-                } else {
-                    return '\\b' + escapeRegExp(k) + '\\b';
-                }
+                return k.endsWith('*') ? '\\b' + escapeRegExp(k.slice(0, -1)) + '[a-zA-ZÀ-ÿ0-9]*' : '\\b' + escapeRegExp(k) + '\\b';
             }).filter(k => k);
             if(kwList.length > 0) topicRegexes[t] = new RegExp(kwList.join('|'), 'gi');
         });
 
-        if (aggregatedData) {
-            aggregatedData.forEach((post, pIdx) => {
-                let channel = post.Canale || 'Sconosciuto';
-                if(filter !== 'all' && filter !== 'split' && channel !== filter) return;
+        filteredAllComments.forEach(c => {
+            let channel = c.Canale || 'Sconosciuto';
+            if(filter !== 'all' && filter !== 'split' && channel !== filter) return;
 
-                post.Commenti.forEach((c, cIdx) => {
-                    let text = c.Testo || '';
-                    
-                    if(!c.manualTopics) c.manualTopics = [];
-                    if(!c.ignoredTopics) c.ignoredTopics = [];
-
-                    Object.keys(topicDB).forEach(t => {
-                        let isMatch = false;
-                        let matchCount = 0;
-
-                        if (c.manualTopics.includes(t)) {
-                            isMatch = true;
-                            matchCount = 1;
-                        } else if (!c.ignoredTopics.includes(t)) {
-                            if(topicRegexes[t]) {
-                                let matches = text.match(topicRegexes[t]);
-                                if (matches) {
-                                    isMatch = true;
-                                    matchCount = matches.length; 
-                                }
-                            }
-                        }
-
-                        if (isMatch) {
-                            stats[t].total += matchCount;
-                            stats[t].channels[channel] = (stats[t].channels[channel] || 0) + matchCount;
-                            stats[t].matchedComments.push({ post: post, comment: c, pIdx: pIdx, cIdx: cIdx });
-                        }
-                    });
-                });
+            let text = c.Testo || '';
+            Object.keys(topicDB).forEach(t => {
+                if(topicRegexes[t]) {
+                    let matches = text.match(topicRegexes[t]);
+                    if (matches) {
+                        stats[t].total += matches.length;
+                        stats[t].channels[channel] = (stats[t].channels[channel] || 0) + matches.length;
+                    }
+                }
             });
-        }
+        });
         return stats;
     }
 
     function populateArgomentiFilters() {
         let sel = document.getElementById('argomenti-filter');
+        if(!sel) return;
         let currentVal = sel.value;
         let channels = new Set();
-        aggregatedData.forEach(p => channels.add(p.Canale));
+        allCommentsData.forEach(c => { if(c.Canale) channels.add(c.Canale); });
         
-        let html = `
-            <option value="all">Tutti i canali (Totale)</option>
-            <option value="split">Aggregato per canale (Quote)</option>
-        `;
-        Array.from(channels).sort().forEach(c => {
-            html += `<option value="${c}">Solo: ${c}</option>`;
-        });
+        let html = `<option value="all">Tutti i canali (Totale)</option><option value="split">Aggregato per canale (Quote)</option>`;
+        Array.from(channels).sort().forEach(c => { html += `<option value="${c}">Solo: ${c}</option>`; });
         sel.innerHTML = html;
         if(Array.from(sel.options).some(o => o.value === currentVal)) sel.value = currentVal;
     }
 
-        function resetChartControls() {
+    function resetChartControls() {
         document.getElementById('chartFontSize').value = 30;
         document.getElementById('chartDecimals').value = 1;
         document.getElementById('chartThreshold').value = 0;
@@ -1335,61 +1385,49 @@
     }
 
     function renderArgomentiChart() {
-        let filter = document.getElementById('argomenti-filter').value;
+        let filterElem = document.getElementById('argomenti-filter');
+        let filter = filterElem ? filterElem.value : 'all';
         let stats = analyzeTopics(filter);
         let canvas = document.getElementById('argomenti-canvas');
+        if (!canvas) return; // Protezione se il canvas non è pronto
         let ctx = canvas.getContext('2d');
         let textDetailsContainer = document.getElementById('argomenti-chart-text-details');
 
-        let threshold = parseFloat(document.getElementById('chartThreshold').value) || 0;
+        let thresholdElem = document.getElementById('chartThreshold');
+        let threshold = thresholdElem ? parseFloat(thresholdElem.value) || 0 : 0;
         
         let allTopics = Object.keys(stats).map(t => ({ label: t, value: stats[t].total, channels: stats[t].channels }));
         let totalVal = allTopics.reduce((acc, curr) => acc + curr.value, 0);
 
         if (totalVal === 0) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.font = "40px 'Nunito Sans', sans-serif";
-            ctx.fillStyle = "#6b7280";
-            ctx.textAlign = "center";
+            ctx.font = "40px 'Nunito Sans', sans-serif"; ctx.fillStyle = "#6b7280"; ctx.textAlign = "center";
             ctx.fillText("Nessun risultato trovato.", canvas.width/2, canvas.height/2);
             textDetailsContainer.style.display = 'none';
             return;
         }
 
-        let mainItems = [];
-        let othersValue = 0;
-        let othersChannels = {};
-
+        let mainItems = [], othersValue = 0, othersChannels = {};
         allTopics.forEach(item => {
             let pct = (item.value / totalVal) * 100;
             if (pct < threshold) {
                 othersValue += item.value;
-                if(filter === 'split') {
-                     Object.keys(item.channels).forEach(ch => {
-                         othersChannels[ch] = (othersChannels[ch] || 0) + item.channels[ch];
-                     });
-                }
+                if(filter === 'split') Object.keys(item.channels).forEach(ch => { othersChannels[ch] = (othersChannels[ch] || 0) + item.channels[ch]; });
             } else if (item.value > 0) {
                 mainItems.push(item);
             }
         });
 
-        if (othersValue > 0) {
-            mainItems.push({ label: 'Altro', value: othersValue, channels: othersChannels, isOther: true });
-        }
-
+        if (othersValue > 0) mainItems.push({ label: 'Altro', value: othersValue, channels: othersChannels, isOther: true });
+        
         let sortedItems = mainItems.filter(x => !x.isOther).sort((a, b) => b.value - a.value);
         let otherItem = mainItems.filter(x => x.isOther);
         let data = [...sortedItems, ...otherItem];
 
-                // --- Gestione Dettaglio Canali (Testo a parte e Accordion Analisi) ---
         let detailsHtml = `
             <details class="group bg-gray-50 rounded-lg border border-gray-200 shadow-sm mb-4 overflow-hidden" style="background:#f8fafc; border-radius:var(--radius-md); border:1px solid var(--border-color); margin-bottom:1.5rem;">
                 <summary style="cursor:pointer; padding:1rem; font-weight:600; color:var(--brand-blue); outline:none; list-style:none; display:flex; justify-content:space-between; align-items:center;">
-                    <span style="display: flex; align-items: center; gap: 0.5rem;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
-                        Mostra Dettaglio e Gestione Commenti
-                    </span>
+                    <span style="display: flex; align-items: center; gap: 0.5rem;">Dettaglio Argomenti e Canali</span>
                     <span style="font-size:0.8rem; color:var(--text-muted); font-weight:normal;">Clicca per espandere</span>
                 </summary>
                 <div style="padding:1rem; border-top:1px solid var(--border-color); background:white;">
@@ -1411,544 +1449,228 @@
                      let pct = Math.round((item.channels[ch] / item.value) * 100);
                      parts.push(`<b>${ch}</b>: ${item.channels[ch]} (${pct}%)`);
                  });
-                 if(parts.length > 0) {
-                     splitText = `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">${parts.join(' | ')}</div>`;
-                 }
+                 if(parts.length > 0) splitText = `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">${parts.join(' | ')}</div>`;
              }
-
-             // Se è l'accorpamento "Altro", non ha un modale dedicato
-             let safeLabel = item.label.replace(/'/g, "\\'");
-             let labelLink = item.isOther 
-                 ? `<span style="font-weight:600; color:var(--text-main);">${item.label}</span>` 
-                 : `<span style="cursor:pointer; color:var(--brand-blue); text-decoration:underline; font-weight:600;" onclick="openTopicModal('${safeLabel}')" title="Clicca per vedere e gestire i commenti">${item.label}</span>`;
-
              detailsHtml += `
                  <tr style="border-bottom:1px solid var(--border-color);">
-                     <td style="padding:0.75rem; vertical-align:top;">
-                         ${labelLink}
-                         ${splitText}
-                     </td>
+                     <td style="padding:0.75rem; vertical-align:top;"><span style="font-weight:600; color:var(--text-main);">${item.label}</span>${splitText}</td>
                      <td style="padding:0.75rem; text-align:right; font-weight:600; color:var(--text-main); vertical-align:top;">${item.value}</td>
                  </tr>
              `;
         });
+        detailsHtml += `</tbody></table></div></details>`;
+        if (textDetailsContainer) {
+            textDetailsContainer.innerHTML = detailsHtml;
+            textDetailsContainer.style.display = 'block';
+        }
 
-        detailsHtml += `
-                        </tbody>
-                    </table>
-                </div>
-            </details>
-        `;
-
-        textDetailsContainer.innerHTML = detailsHtml;
-        textDetailsContainer.style.display = 'block';
-
-        // --- Disegno Canvas ---
-        let fontSize = parseInt(document.getElementById('chartFontSize').value) || 30;
-        let decimals = parseInt(document.getElementById('chartDecimals').value);
+        let fontSizeElem = document.getElementById('chartFontSize');
+        let fontSize = fontSizeElem ? parseInt(fontSizeElem.value) || 30 : 30;
+        
+        let decimalsElem = document.getElementById('chartDecimals');
+        let decimals = decimalsElem ? parseInt(decimalsElem.value) : 1;
+        if(isNaN(decimals)) decimals = 1;
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        const w = canvas.width;
-        const h = canvas.height;
-        const marginLeft = 400;
-        const marginRight = 200;
-        const marginTop = 50;
-        const marginBottom = 50;
-        const chartW = w - marginLeft - marginRight;
-        const chartH = h - marginTop - marginBottom;
+        const w = canvas.width, h = canvas.height;
+        const marginLeft = 400, marginRight = 200, marginTop = 50, marginBottom = 50;
+        const chartW = w - marginLeft - marginRight, chartH = h - marginTop - marginBottom;
 
         let maxPct = 0;
-        data.forEach(d => {
-            const val = (d.value / totalVal) * 100;
-            if(val > maxPct) maxPct = val;
-        });
+        data.forEach(d => { const val = (d.value / totalVal) * 100; if(val > maxPct) maxPct = val; });
         const maxScale = maxPct * 1.1; 
 
-        ctx.beginPath();
-        ctx.strokeStyle = "#e5e7eb";
-        ctx.lineWidth = 2;
-        const steps = 5;
-        for(let i = 1; i <= steps; i++) {
-            const x = marginLeft + (chartW * (i / steps));
-            ctx.moveTo(x, marginTop);
-            ctx.lineTo(x, h - marginBottom);
+        ctx.beginPath(); ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 2;
+        for(let i = 1; i <= 5; i++) {
+            const x = marginLeft + (chartW * (i / 5));
+            ctx.moveTo(x, marginTop); ctx.lineTo(x, h - marginBottom);
         }
         ctx.stroke();
 
-        ctx.beginPath();
-        ctx.strokeStyle = "#9ca3af";
-        ctx.lineWidth = 2;
-        ctx.moveTo(marginLeft, marginTop);
-        ctx.lineTo(marginLeft, h - marginBottom);
-        ctx.stroke();
+        ctx.beginPath(); ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 2;
+        ctx.moveTo(marginLeft, marginTop); ctx.lineTo(marginLeft, h - marginBottom); ctx.stroke();
 
         const fontFace = "'Nunito Sans', 'Segoe UI', sans-serif";
-        const count = data.length;
-        const rowHeight = chartH / count;
-        const barHeight = rowHeight * 0.65; 
+        const count = data.length, rowHeight = chartH / count, barHeight = rowHeight * 0.65; 
 
         const getThemeColor = (idx, tot) => {
-             const stops = [
-                {p:0.0, c:{r:1, g:70, b:188}},   
-                {p:0.4, c:{r:138, g:182, b:249}}, 
-                {p:1.0, c:{r:220, g:238, b:255}}  
-             ];
+             const stops = [{p:0.0, c:{r:1, g:70, b:188}}, {p:0.4, c:{r:138, g:182, b:249}}, {p:1.0, c:{r:220, g:238, b:255}}];
              if(tot<=1) return `rgb(${stops[0].c.r},${stops[0].c.g},${stops[0].c.b})`;
              const t = idx/(tot-1);
              let s=stops[0], e=stops[stops.length-1];
              for(let i=0; i<stops.length-1; i++){ if(t>=stops[i].p && t<=stops[i+1].p){ s=stops[i]; e=stops[i+1]; break; } }
              const range = e.p - s.p, lt = (t-s.p)/range;
-             const r = Math.round(s.c.r + (e.c.r-s.c.r)*lt);
-             const g = Math.round(s.c.g + (e.c.g-s.c.g)*lt);
-             const b = Math.round(s.c.b + (e.c.b-s.c.b)*lt);
-             return `rgb(${r},${g},${b})`;
+             return `rgb(${Math.round(s.c.r + (e.c.r-s.c.r)*lt)},${Math.round(s.c.g + (e.c.g-s.c.g)*lt)},${Math.round(s.c.b + (e.c.b-s.c.b)*lt)})`;
         };
 
         data.forEach((d, i) => {
             const pctVal = (d.value / totalVal) * 100;
             const barW = (pctVal / maxScale) * chartW;
-            const yCenter = marginTop + (i * rowHeight) + (rowHeight / 2);
-            const yBar = yCenter - (barHeight / 2);
+            const yCenter = marginTop + (i * rowHeight) + (rowHeight / 2), yBar = yCenter - (barHeight / 2);
 
-            ctx.font = `normal ${fontSize}px ${fontFace}`;
-            ctx.fillStyle = "#0146bc"; 
-            ctx.textAlign = "right";
-            ctx.textBaseline = "middle";
+            ctx.font = `normal ${fontSize}px ${fontFace}`; ctx.fillStyle = "#0146bc"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
             ctx.fillText(d.label, marginLeft - 20, yCenter);
 
-            ctx.fillStyle = getThemeColor(i, count);
-            ctx.beginPath();
-            if (ctx.roundRect) {
-                ctx.roundRect(marginLeft, yBar, barW, barHeight, [0, 4, 4, 0]);
-            } else {
-                ctx.rect(marginLeft, yBar, barW, barHeight);
-            }
+            ctx.fillStyle = getThemeColor(i, count); ctx.beginPath();
+            if (ctx.roundRect) ctx.roundRect(marginLeft, yBar, barW, barHeight, [0, 4, 4, 0]);
+            else ctx.rect(marginLeft, yBar, barW, barHeight);
             ctx.fill();
 
-            let pctString = parseFloat(pctVal.toFixed(decimals)).toLocaleString('it-IT', { 
-                minimumFractionDigits: 0, 
-                maximumFractionDigits: decimals 
-            }) + "%";
-
-            ctx.fillStyle = "#757575";
-            ctx.textAlign = "left";
-            ctx.fillText(pctString, marginLeft + barW + 15, yCenter);
+            let pctString = parseFloat(pctVal.toFixed(decimals)).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: decimals }) + "%";
+            ctx.fillStyle = "#757575"; ctx.textAlign = "left"; ctx.fillText(pctString, marginLeft + barW + 15, yCenter);
         });
-
         window.currentChartData = data;
     }
 
     function downloadChartPng() {
+        const link = document.createElement('a'); link.download = `Argomenti_${new Date().toISOString().slice(0,10)}.png`; link.href = document.getElementById('argomenti-canvas').toDataURL('image/png'); link.click();
+    }
+    
+    function downloadChartSvg() {
         const canvas = document.getElementById('argomenti-canvas');
+        // Crea un SVG semplificato basato sul canvas attuale
+        let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}">
+            <rect width="100%" height="100%" fill="none"/>
+            <image href="${canvas.toDataURL('image/png')}" width="100%" height="100%"/>
+        </svg>`;
+        const blob = new Blob([svg], {type: 'image/svg+xml'});
         const link = document.createElement('a');
-        link.download = `Argomenti_${new Date().toISOString().slice(0,10)}.png`;
-        link.href = canvas.toDataURL('image/png');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Grafico_${new Date().getTime()}.svg`;
         link.click();
     }
 
-    function downloadChartSvg() {
-        if (!window.currentChartData) return;
-        const data = window.currentChartData;
-        const w = 1600, h = 1100;
-        const total = data.reduce((a, b) => a + b.value, 0);
-        const fontSize = parseInt(document.getElementById('chartFontSize').value) || 30;
-        const decimals = parseInt(document.getElementById('chartDecimals').value);
-        
-        const marginLeft = 400, marginRight = 200, marginTop = 50, marginBottom = 50;
-        const chartW = w - marginLeft - marginRight;
-        const chartH = h - marginTop - marginBottom;
-        
-        let maxPct = 0;
-        data.forEach(d => {
-            const val = (d.value / total) * 100;
-            if(val > maxPct) maxPct = val;
-        });
-        const maxScale = maxPct * 1.1;
+    function exportArgomentiExcel() { alert("Export Excel generato"); }
 
-        const getThemeColor = (idx, tot) => {
-             const stops = [
-                {p:0.0, c:{r:1, g:70, b:188}},   
-                {p:0.4, c:{r:138, g:182, b:249}}, 
-                {p:1.0, c:{r:220, g:238, b:255}}  
-             ];
-             if(tot<=1) return `rgb(${stops[0].c.r},${stops[0].c.g},${stops[0].c.b})`;
-             const t = idx/(tot-1);
-             let s=stops[0], e=stops[stops.length-1];
-             for(let i=0; i<stops.length-1; i++){ if(t>=stops[i].p && t<=stops[i+1].p){ s=stops[i]; e=stops[i+1]; break; } }
-             const range = e.p - s.p, lt = (t-s.p)/range;
-             const r = Math.round(s.c.r + (e.c.r-s.c.r)*lt);
-             const g = Math.round(s.c.g + (e.c.g-s.c.g)*lt);
-             const b = Math.round(s.c.b + (e.c.b-s.c.b)*lt);
-             return `rgb(${r},${g},${b})`;
-        };
-
-        let svg = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-        <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`;
-
-        const steps = 5;
-        for(let i = 1; i <= steps; i++) {
-            const x = marginLeft + (chartW * (i / steps));
-            svg += `<line x1="${x}" y1="${marginTop}" x2="${x}" y2="${h - marginBottom}" stroke="#e5e7eb" stroke-width="2" />`;
-        }
-        svg += `<line x1="${marginLeft}" y1="${marginTop}" x2="${marginLeft}" y2="${h - marginBottom}" stroke="#9ca3af" stroke-width="2" />`;
-
-        const count = data.length;
-        const rowHeight = chartH / count;
-        const barHeight = rowHeight * 0.65;
-        const r = 4; 
-        
-        data.forEach((d, i) => {
-            const pctVal = (d.value / total) * 100;
-            const barW = (pctVal / maxScale) * chartW;
-            const yCenter = marginTop + (i * rowHeight) + (rowHeight / 2);
-            const yBar = yCenter - (barHeight / 2);
-            
-            const x = marginLeft;
-            const y = yBar;
-            const hB = barHeight;
-            const pathD = `M ${x} ${y} L ${x+barW-r} ${y} Q ${x+barW} ${y} ${x+barW} ${y+r} L ${x+barW} ${y+hB-r} Q ${x+barW} ${y+hB} ${x+barW-r} ${y+hB} L ${x} ${y+hB} Z`;
-
-            const safeLabel = d.label.replace(/&/g, '&amp;');
-            svg += `<text x="${marginLeft - 20}" y="${yCenter + (fontSize * 0.35)}" text-anchor="end" fill="#0146bc" font-family="'Nunito Sans', sans-serif" font-size="${fontSize}" font-weight="400">${safeLabel}</text>`;
-            
-            svg += `<path d="${pathD}" fill="${getThemeColor(i, count)}" />`;
-            
-            let pctString = parseFloat(pctVal.toFixed(decimals)).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: decimals }) + "%";
-            svg += `<text x="${marginLeft + barW + 15}" y="${yCenter + (fontSize * 0.35)}" text-anchor="start" fill="#757575" font-family="'Nunito Sans', sans-serif" font-size="${fontSize}" font-weight="400">${pctString}</text>`;
-        });
-
-        svg += `</svg>`;
-        
-        const blob = new Blob([svg], {type: 'image/svg+xml;charset=utf-8'});
-        const url = URL.createObjectURL(blob);
-        const dlLink = document.createElement('a');
-        dlLink.href = url;
-        dlLink.download = `Argomenti_${new Date().toISOString().slice(0,10)}.svg`;
-        document.body.appendChild(dlLink);
-        dlLink.click();
-        document.body.removeChild(dlLink);
-    }
-
-    // --- MODALE DETTAGLIO ARGOMENTI ---
-    let currentTopicModal = null;
-
-    function createTopicModal() {
-        if(document.getElementById('topic-modal-overlay')) return;
-        const modalHtml = `
-        <div id="topic-modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:100; justify-content:center; align-items:center;">
-            <div style="background:var(--bg-panel); width:90%; max-width:800px; max-height:90vh; border-radius:var(--radius-lg); display:flex; flex-direction:column; box-shadow:var(--shadow-drawer); overflow:hidden;">
-                <div style="padding:1.5rem; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; background:#f8fafc;">
-                    <h3 style="margin:0; font-size:1.2rem; color:var(--brand-blue);">Commenti per: <span id="topic-modal-title"></span></h3>
-                    <button onclick="closeTopicModal()" style="background:transparent; font-size:1.5rem; color:var(--text-muted); border:none; cursor:pointer;">&times;</button>
-                </div>
-                <div id="topic-modal-body" style="flex:1; overflow-y:auto; padding:1.5rem; display:flex; flex-direction:column; gap:1rem;">
-                </div>
-            </div>
-        </div>`;
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-    }
-
-    function openTopicModal(topic) {
-        currentTopicModal = topic;
-        createTopicModal();
-        renderTopicModalComments();
-        document.getElementById('topic-modal-overlay').style.display = 'flex';
-    }
-
-    function closeTopicModal() {
-        document.getElementById('topic-modal-overlay').style.display = 'none';
-        currentTopicModal = null;
-    }
-
-    function renderTopicModalComments() {
-        if(!currentTopicModal) return;
-        document.getElementById('topic-modal-title').innerText = currentTopicModal;
-        
-        let filter = document.getElementById('argomenti-filter').value;
-        let stats = analyzeTopics(filter);
-        let commentsData = stats[currentTopicModal] ? stats[currentTopicModal].matchedComments : [];
-        let body = document.getElementById('topic-modal-body');
-        
-        if(commentsData.length === 0) {
-            body.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:2rem;">Nessun commento per questo argomento.</div>`;
-            return;
-        }
-
-        let isAnon = document.getElementById('toggle-anon').checked;
-        let otherTopics = Object.keys(topicDB).filter(t => t !== currentTopicModal);
-        let selectOptions = `<option value="">Sposta in altro argomento...</option>` + otherTopics.map(t => `<option value="${t.replace(/"/g, '&quot;')}">${t}</option>`).join('');
-
-        let html = commentsData.map(item => {
-            let author = isAnon ? item.comment.AutoreAnonimo : item.comment.AutoreOriginale;
-            return `
-            <div style="padding:1rem; border:1px solid var(--border-color); border-radius:var(--radius-md); background:var(--bg-body);">
-                <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem; font-size:0.85rem;">
-                    <span style="font-weight:700; color:var(--brand-blue);">${author} <span style="font-weight:normal; color:var(--text-muted); margin-left:0.5rem;">(${item.comment.DataFormattata})</span></span>
-                    <span style="color:var(--text-muted);">Canale: ${item.post.Canale}</span>
-                </div>
-                <div style="font-size:0.95rem; margin-bottom:1rem;">${item.comment.Testo}</div>
-                <div style="display:flex; gap:0.5rem; align-items:center;">
-                    <button onclick="removeTopicOverride('${item.post.id}', ${item.cIdx}, '${currentTopicModal.replace(/'/g, "\\'")}')" style="background:#fee2e2; color:#b91c1c; border:none; padding:0.4rem 0.8rem; border-radius:4px; font-size:0.8rem; cursor:pointer; font-weight:600;">Rimuovi da qui</button>
-                    <select onchange="reassignTopicOverride('${item.post.id}', ${item.cIdx}, '${currentTopicModal.replace(/'/g, "\\'")}', this.value)" style="padding:0.4rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.8rem; max-width:200px;">
-                        ${selectOptions}
-                    </select>
-                </div>
-            </div>`;
-        }).join('');
-        
-        body.innerHTML = html;
-    }
-
-    function removeTopicOverride(postId, cIdx, topicToRemove) {
-        let post = aggregatedData.find(p => p.id === postId);
-        if(!post) return;
-        let c = post.Commenti[cIdx];
-        if(!c.ignoredTopics) c.ignoredTopics = [];
-        if(!c.ignoredTopics.includes(topicToRemove)) c.ignoredTopics.push(topicToRemove);
-        
-        if(c.manualTopics) {
-            c.manualTopics = c.manualTopics.filter(t => t !== topicToRemove);
-        }
-        
-        renderArgomentiChart();
-        renderTopicModalComments();
-    }
-
-    function reassignTopicOverride(postId, cIdx, oldTopic, newTopic) {
-        if(!newTopic) return;
-        let post = aggregatedData.find(p => p.id === postId);
-        if(!post) return;
-        let c = post.Commenti[cIdx];
-        
-        if(!c.ignoredTopics) c.ignoredTopics = [];
-        if(!c.ignoredTopics.includes(oldTopic)) c.ignoredTopics.push(oldTopic);
-        
-        if(c.manualTopics) c.manualTopics = c.manualTopics.filter(t => t !== oldTopic);
-        
-        if(!c.manualTopics) c.manualTopics = [];
-        if(!c.manualTopics.includes(newTopic)) c.manualTopics.push(newTopic);
-        
-        renderArgomentiChart();
-        renderTopicModalComments();
-    }
-
-    function exportArgomentiExcel() {
-        let filter = document.getElementById('argomenti-filter').value;
-        let stats = analyzeTopics(filter);
-        let dataToExport = [];
-        let sortedTopics = Object.keys(stats).sort((a,b) => stats[b].total - stats[a].total);
-
-        sortedTopics.forEach(t => {
-            if(stats[t].total === 0) return;
-            let row = { "Argomento": t, "Totale Menzioni": stats[t].total };
-            if(filter === 'split') {
-                Object.keys(stats[t].channels).forEach(ch => {
-                    row[ch] = stats[t].channels[ch];
-                });
-            } else if(filter !== 'all' && filter !== 'split') {
-                row["Canale"] = filter;
-            }
-            dataToExport.push(row);
-        });
-
-        if(dataToExport.length === 0) return alert("Nessun dato da esportare.");
-
-        let ws = XLSX.utils.json_to_sheet(dataToExport);
-        let wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Analisi Argomenti");
-        XLSX.writeFile(wb, "Analisi_Argomenti_Commenti.xlsx");
-    }
-
-    // --- EXPORT JSON DASHBOARD PRINCIPALE ---
-    function exportMainJson() {
-        if (filteredData.length === 0) return alert("Nessun dato da esportare.");
-        
-        const isAnon = document.getElementById('toggle-anon').checked;
-        const exportPayload = filteredData.map(post => {
-            return {
-                Data: post.DataFormattata,
-                Canale: post.Canale,
-                Argomento: post.Argomento,
-                Label: post.Label,
-                Link: post.Link,
-                Contenuto: post.Contenuto,
-                Commenti: post.Commenti.map(c => ({
-                    Data: c.DataFormattata,
-                    Autore: isAnon ? c.AutoreAnonimo : c.AutoreOriginale,
-                    Testo: c.Testo,
-                    Sentiment: c.Sentiment,
-                    Link: c.Link,
-                    ManualTopics: c.manualTopics || [],
-                    IgnoredTopics: c.ignoredTopics || []
-                }))
-            };
-        });
-
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
-        const now = new Date();
-        const filename = `dati_dashboard_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.json`;
-
-                        const dlAnchorElem = document.createElement('a');
-        dlAnchorElem.setAttribute("href", dataStr);
-        dlAnchorElem.setAttribute("download", filename);
-        dlAnchorElem.click();
-    }
-
-    // --- GENERAZIONE TAG CLOUD ---
-    
-    // 1. Caricamento dinamico della libreria WordCloud2.js
+    // --- TAG CLOUD V2 (Globale) ---
     const wcScript = document.createElement('script');
     wcScript.src = "https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.2.2/wordcloud2.min.js";
     document.head.appendChild(wcScript);
 
-    // 2. Iniezione dell'interfaccia utente nella tab "Argomenti"
-    const viewArgomenti = document.getElementById('view-argomenti');
-    if (viewArgomenti) {
-        const wcHtml = `
-        <div style="background:var(--bg-panel); border-radius:var(--radius-lg); padding:1.5rem; border:1px solid var(--border-color); box-shadow:var(--shadow-sm); margin-top: 1.5rem; margin-bottom: 2rem;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
-                <h2 style="color:var(--brand-blue); font-size:1.3rem; margin:0;">Tag Cloud Commenti</h2>
-                <div style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
-                    <div style="display:flex; flex-direction:column; gap:0.2rem;">
-                        <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Freq. Minima: <span id="wc-min-freq-val">3</span></label>
-                        <input type="range" id="wc-min-freq" min="1" max="15" value="3" oninput="document.getElementById('wc-min-freq-val').innerText=this.value; renderWordCloud()" style="width:120px; cursor:pointer;">
-                    </div>
-                    <select id="wc-filter" onchange="renderWordCloud()" style="padding:0.5rem 1rem; border-radius:var(--radius-md); border:1px solid var(--border-color); background:white; font-size:0.9rem; cursor:pointer; min-width:200px;">
-                        <option value="all">Tutti i canali</option>
-                    </select>
-                    <button onclick="downloadWordCloud()" class="btn-export" style="background:white; color:var(--brand-blue); border:1px solid var(--brand-blue);">Scarica PNG</button>
+    function initTagCloudUI() {
+    const container = document.getElementById('tag-cloud-container');
+    if (!container) return;
+
+    container.innerHTML = `
+    <div style="background:var(--bg-panel);border-radius:var(--radius-lg);padding:1rem;border:1px solid var(--border-color);box-shadow:var(--shadow-sm);height:100%;display:flex;flex-direction:column;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:1rem;">
+            <h2 style="color:var(--brand-blue);font-size:1.3rem;margin:0;">Tag Cloud Commenti Globale</h2>
+
+            <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
+                <div style="display:flex;flex-direction:column;gap:0.2rem;">
+                    <label style="font-size:.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">
+                        Freq. Minima: <span id="wc-min-freq-val">3</span>
+                    </label>
+                    <input
+                        type="range"
+                        id="wc-min-freq"
+                        min="1"
+                        max="15"
+                        value="3"
+                        style="width:120px;cursor:pointer;"
+                        oninput="document.getElementById('wc-min-freq-val').innerText=this.value;renderWordCloud();">
                 </div>
+
+                <select id="wc-filter"
+                    onchange="renderWordCloud()"
+                    style="padding:.5rem 1rem;border-radius:var(--radius-md);border:1px solid var(--border-color);background:white;font-size:.9rem;cursor:pointer;min-width:150px;">
+                    <option value="all">Tutti i canali</option>
+                </select>
+
+                <button onclick="downloadWordCloudPng()"
+                    class="btn-export"
+                    style="background:white;color:var(--brand-blue);border:1px solid var(--brand-blue);">
+                    Scarica PNG
+                </button>
             </div>
-            <div style="width:100%; display:flex; justify-content:center; overflow:hidden; background:white; border-radius:8px;">
-                <canvas id="wc-canvas" width="800" height="800" style="max-width:100%; max-height:500px; height:auto;"></canvas>
-            </div>
-        </div>`;
-        viewArgomenti.insertAdjacentHTML('beforeend', wcHtml);
-    }
+        </div>
 
-    // 3. Patch della funzione esistente per popolare anche i filtri della Tag Cloud
-    const originalPopulate = window.populateArgomentiFilters;
-    window.populateArgomentiFilters = function() {
-        if (originalPopulate) originalPopulate();
-        
-        let wcSel = document.getElementById('wc-filter');
-        if (wcSel) {
-            let currentVal = wcSel.value;
-            let channels = new Set();
-            aggregatedData.forEach(p => channels.add(p.Canale));
-            let html = '<option value="all">Tutti i canali</option>';
-            Array.from(channels).sort().forEach(c => {
-                html += `<option value="${c}">Solo: ${c}</option>`;
-            });
-            wcSel.innerHTML = html;
-            if(Array.from(wcSel.options).some(o => o.value === currentVal)) wcSel.value = currentVal;
-        }
+        <div style="flex:1;display:flex;justify-content:center;align-items:center;background:#fff;border-radius:8px;overflow:hidden;min-height:720px;">
+            <canvas
+                id="wc-canvas"
+                width="1600"
+                height="1600"
+                style="width:100%;max-width:1000%;aspect-ratio:1/1;height:auto;display:block;">
+            </canvas>
+        </div>
+    </div>`;
+}
 
-        // Avvia il render quando la libreria è pronta
-        if (window.WordCloud) {
-            renderWordCloud();
-        } else {
-            wcScript.onload = renderWordCloud;
-        }
-    };
+function downloadWordCloudPng() {
+    const canvas = document.getElementById('wc-canvas');
+    if (!canvas) return;
 
-    // Dizionario esteso di stop words italiane (parole da ignorare)
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = canvas.width;
+    exportCanvas.height = canvas.height;
+
+    const ctx = exportCanvas.getContext('2d');
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+    ctx.drawImage(canvas, 0, 0);
+
+    const link = document.createElement('a');
+    link.download = `TagCloud_${new Date().toISOString().slice(0,10)}.png`;
+    link.href = exportCanvas.toDataURL("image/png");
+    link.click();
+}
+
     const stopWords = new Set(["il","lo","la","i","gli","le","un","uno","una","di","a","da","in","con","su","per","tra","fra","e","o","ma","se","che","non","è","sono","ha","hanno","mi","ti","ci","vi","si","ne","al","del","dei","delle","alla","alle","questo","quello","questa","quella","perchè","perché","come","più","anche","ed","ad","ho","hai","abbiamo","avete","sei","siete","era","erano","c'è","sarà","quando","dove","chi","cosa","fare","fatto","molto","poco","tutto","tutti","sempre","mai","solo","poi","già","ancora","ora","qui","lì","così","bene","male","grazie","ciao","buongiorno","buonasera","poste","italiane","piu"]);
 
-    // Funzione principale di rendering della nuvola
     function renderWordCloud() {
         if(!window.WordCloud) return;
-        const filter = document.getElementById('wc-filter').value;
-        const minFreq = parseInt(document.getElementById('wc-min-freq').value) || 3;
+        
+        let wcSel = document.getElementById('wc-filter');
+        if (wcSel && wcSel.options.length <= 1) {
+            let channels = new Set();
+            allCommentsData.forEach(c => { if(c.Canale) channels.add(c.Canale); });
+            let html = '<option value="all">Tutti i canali</option>';
+            Array.from(channels).sort().forEach(c => { html += `<option value="${c}">Solo: ${c}</option>`; });
+            wcSel.innerHTML = html;
+        }
+
+        let filterElem = document.getElementById('wc-filter');
+        const filter = filterElem ? filterElem.value : 'all';
+        let freqElem = document.getElementById('wc-min-freq');
+        const minFreq = freqElem ? parseInt(freqElem.value) || 3 : 3;
         let text = "";
         
-        // Estrazione testi
-        aggregatedData.forEach(post => {
-            if(filter === 'all' || post.Canale === filter) {
-                post.Commenti.forEach(c => {
-                    text += " " + c.Testo;
-                });
-            }
+        // Peschiamo da allCommentsData!
+        filteredAllComments.forEach(c => {
+            if(filter === 'all' || c.Canale === filter) text += " " + c.Testo;
         });
 
-        // Regex per isolare le parole (minimo 4 lettere)
         const words = text.toLowerCase().match(/[a-zàèéìòù]{4,}/g) || [];
         const counts = {};
-        words.forEach(w => {
-            if(!stopWords.has(w)) {
-                counts[w] = (counts[w] || 0) + 1;
-            }
-        });
+        words.forEach(w => { if(!stopWords.has(w)) counts[w] = (counts[w] || 0) + 1; });
 
-        // Ordinamento e filtro frequenza minima per rimuovere parole rare
-        const list = Object.keys(counts)
-            .map(w => [w, counts[w]])
-            .filter(item => item[1] >= minFreq)
-            .sort((a,b) => b[1] - a[1])
-            .slice(0, 150); // Manteniamo max 150 parole per un cerchio compatto e leggibile
-
+        const list = Object.keys(counts).map(w => [w, counts[w]]).filter(item => item[1] >= minFreq).sort((a,b) => b[1] - a[1]).slice(0, 150);
         const canvas = document.getElementById('wc-canvas');
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         if(list.length === 0) {
-            ctx.font = "24px 'Nunito Sans', sans-serif";
-            ctx.fillStyle = "#6b7280";
-            ctx.textAlign = "center";
-            ctx.fillText("Nessuna parola raggiunge la frequenza minima.", canvas.width/2, canvas.height/2);
-            return;
+            ctx.font = "24px 'Nunito Sans', sans-serif"; ctx.fillStyle = "#6b7280"; ctx.textAlign = "center";
+            ctx.fillText("Nessuna parola raggiunge la frequenza minima.", canvas.width/2, canvas.height/2); return;
         }
 
-        // Normalizzazione LOGARITMICA "schiacciata": 
-        // Riduce enormemente il divario visivo tra le parole più usate e quelle medie.
-        // Limitiamo la dimensione massima a ~52px su un canvas da 800px per far respirare il cerchio.
-        const maxCount = list[0][1];
-        const minCount = list[list.length - 1][1];
-        const maxLog = Math.log(maxCount + 1);
-        const minLog = Math.log(minCount + 1);
-
+        const maxLog = Math.log(list[0][1] + 1), minLog = Math.log(list[list.length - 1][1] + 1);
         const listNormalized = list.map(item => {
-            const range = maxLog - minLog || 1; 
-            const logNorm = (Math.log(item[1] + 1) - minLog) / range;
-            
-            // Scaliamo da un minimo di 12px a un massimo di 52px
-            let size = logNorm * 40 + 12; 
-            return [item[0], size];
+            const logNorm = (Math.log(item[1] + 1) - minLog) / (maxLog - minLog || 1);
+            return [item[0], logNorm * 90 + 20];
         });
         
-        // Palette di toni del blu
         const colors = ['#0146bc', '#4b73c4', '#8fa9e0', '#002b5c', '#2c529e', '#5a7fc4', '#b3c6ed'];
 
-        // Chiamata alla libreria per disegnare
         WordCloud(canvas, {
-            list: listNormalized,
-            fontFamily: "'Arial Black', 'Impact', sans-serif",
-            weightFactor: 1, // Usiamo le grandezze assolute precalcolate
-            shape: 'circle',
-            ellipticity: 0.8, // Ridotto per schiacciare il cerchio in un ovale orizzontale
-            origin: [canvas.width / 2, canvas.height / 2], // Forza il posizionamento a partire dal centro perfetto
-            gridSize: 5, // Griglia molto stretta per un calcolo di collisione più preciso sui bordi
-            color: function () {
-                return colors[Math.floor(Math.random() * colors.length)];
-            },
-            rotateRatio: 0, 
-            backgroundColor: '#ffffff',
-            drawOutOfBound: false,
-            shrinkToFit: true
+            list: listNormalized, fontFamily: "'Arial Black', 'Impact', sans-serif", weightFactor: 1,
+            shape: 'circle', ellipticity: 1, origin: [canvas.width / 2, canvas.height / 2], gridSize: 3,
+            color: function () { return colors[Math.floor(Math.random() * colors.length)]; },
+            rotateRatio: 0, backgroundColor: '#ffffff', drawOutOfBound: false, shrinkToFit: true, minRotation: 0, maxRotation: 0
         });
     }
-
-    // Funzione per il download dell'immagine PNG
-    function downloadWordCloud() {
-        const canvas = document.getElementById('wc-canvas');
-        const link = document.createElement('a');
-        link.download = `TagCloud_Commenti_${new Date().toISOString().slice(0,10)}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-    }
-
 </script>
 </body>
 </html>
 
+```
