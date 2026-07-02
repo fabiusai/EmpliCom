@@ -550,9 +550,115 @@
         document.getElementById('badge-posts').style.display = 'block';
         document.getElementById('badge-comments').style.display = 'block';
         document.getElementById('btn-export').style.display = 'block';
+        
+        // Iniezione del nuovo pulsante "Json per report"
+        if (!document.getElementById('btn-export-report')) {
+            const btnExport = document.getElementById('btn-export');
+            const btnReport = document.createElement('button');
+            btnReport.className = 'btn-export';
+            btnReport.id = 'btn-export-report';
+            btnReport.innerText = 'Json per report';
+            btnReport.style.backgroundColor = '#10b981'; // Verde per distinguerlo
+            btnReport.style.marginLeft = '10px';
+            btnReport.onclick = exportReportJson;
+            btnExport.parentNode.insertBefore(btnReport, btnExport.nextSibling);
+        }
+        
         initSidebar();
         applyFilters();
         populateArgomentiFilters();
+    }
+
+    // Helper: parsa il formato K/M (es. 1,23K -> 1230)
+    function parseValueKM(val) {
+        val = val.trim().toUpperCase().replace(',', '.');
+        let multiplier = 1;
+        if (val.endsWith('K')) { multiplier = 1000; val = val.slice(0, -1); }
+        else if (val.endsWith('M')) { multiplier = 1000000; val = val.slice(0, -1); }
+        return parseFloat(val) * multiplier;
+    }
+
+    // Helper: formatta i numeri in K/M
+    function formatValueKM(num) {
+        if (num >= 1000000) return (num / 1000000).toLocaleString('it-IT', {maximumFractionDigits: 2}) + 'M';
+        if (num >= 1000) return (num / 1000).toLocaleString('it-IT', {maximumFractionDigits: 2}) + 'K';
+        return num.toString();
+    }
+
+    // Logica di esportazione report JSON basata sui dati del grafico
+    function exportReportJson() {
+        if (filteredData.length === 0) return alert("Nessun dato da esportare.");
+
+        // 1. Calcolo totale commenti
+        let totCommenti = 0;
+        filteredData.forEach(post => {
+            totCommenti += post.Commenti.length;
+        });
+
+        // Prompt per il dato del mese precedente
+        let prevInput = prompt("Inserisci il numero di commenti del mese precedente (es. 1,23K):", "0");
+        if (prevInput === null) return;
+        
+        let prevVal = parseValueKM(prevInput);
+        if (isNaN(prevVal)) {
+            alert("Valore non valido. Riprova con un numero corretto.");
+            return;
+        }
+
+        // Calcolo della variazione percentuale
+        let diffPct = prevVal === 0 ? (totCommenti > 0 ? 100 : 0) : ((totCommenti - prevVal) / prevVal) * 100;
+        let variazioneStr = "linea";
+        if (diffPct > 1) variazioneStr = "crescita";
+        else if (diffPct < -1) variazioneStr = "decrescita";
+
+        // 2. Calcolo argomento prevalente dal motore di analisi (Grafico)
+        let filter = document.getElementById('argomenti-filter') ? document.getElementById('argomenti-filter').value : 'all';
+        let stats = analyzeTopics(filter);
+        
+        let allTopics = Object.keys(stats).map(t => ({ label: t, value: stats[t].total }));
+        let totalValChart = allTopics.reduce((acc, curr) => acc + curr.value, 0);
+        
+        let topTopic = "-";
+        let percTop = "0%";
+
+        if (totalValChart > 0) {
+            allTopics.sort((a, b) => b.value - a.value); // Ordina per valore decrescente
+            topTopic = allTopics[0].label;
+            
+            // Applica i decimali scelti dall'utente nell'interfaccia (default 1)
+            let decimals = document.getElementById('chartDecimals') ? parseInt(document.getElementById('chartDecimals').value) : 1;
+            if (isNaN(decimals)) decimals = 1;
+            
+            percTop = ((allTopics[0].value / totalValChart) * 100).toLocaleString('it-IT', {
+                minimumFractionDigits: 0, 
+                maximumFractionDigits: decimals
+            }) + "%";
+        }
+
+        // 3. Creazione e download JSON
+        const reportData = {
+            "Totale commenti": formatValueKM(totCommenti),
+            "Dettaglio Argomenti: Temi trattati Poste Italiane FB: l'argomento con più commenti": topTopic,
+            "Dettaglio Argomenti: valore in percentuale commenti argomento Temi trattati Poste Italiane FB": percTop,
+            "Variazione commenti rispetto al mese precedente": variazioneStr
+        };
+
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(reportData, null, 2));
+        
+        const now = new Date();
+        const aaaa = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const gg = String(now.getDate()).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mnm = String(now.getMinutes()).padStart(2, '0');
+        const filename = `ES3_${aaaa}_${mm}_${gg}_${hh}_${mnm}_Community_json.json`;
+
+        const dlAnchorElem = document.createElement('a');
+        dlAnchorElem.setAttribute("href", dataStr);
+        dlAnchorElem.setAttribute("download", filename);
+        document.body.appendChild(dlAnchorElem);
+        dlAnchorElem.click();
+        document.body.removeChild(dlAnchorElem);
     }
 
     // --- PARSING ---
