@@ -234,7 +234,7 @@
             <h1>Social Data Dashboard</h1>
             <div class="topbar-right">
                 <div class="stat-badge" id="badge-sentiment" style="display: none; padding: 0.3rem 0.5rem; flex-direction: column; align-items: center; justify-content: center; min-width: 140px;">
-                    <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; font-weight: bold;">Sentiment Globale</div>
+                    <div id="sentiment-badge-label" style="font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; font-weight: bold;">Sentiment Post</div>
                     <div class="sentiment-bar-container" style="width: 100%; height: 8px; margin: 0; border-radius: 4px;" id="global-sentiment-bar"></div>
                 </div>
                 <div class="stat-badge" style="display: flex; align-items: center; gap: 0.5rem; background-color: #f0fdf4; border-color: #bbf7d0;">
@@ -243,7 +243,8 @@
                 </div>
                 <div class="stat-badge" id="badge-posts" style="display: none;">Post: <span id="stat-posts">0</span></div>
                 <div class="stat-badge" id="badge-comments" style="display: none;">Commenti (in Post): <span id="stat-comments">0</span></div>
-                <button class="btn-export" id="btn-export" style="display: none;" onclick="exportCurrentView()">Esporta JSON Post</button>
+                <button class="btn-export" id="btn-export" style="display: none;" onclick="exportMainJson()">Esporta JSON Post</button>
+                <button class="btn-export" id="btn-export-global" style="display: none;" onclick="exportGlobalJson()">Esporta JSON Commenti</button>
             </div>
         </div>
         <div class="topbar-tabs" id="app-tabs">
@@ -482,6 +483,10 @@
             filterTopics.style.display = 'block';
             filterLabels.style.display = 'block';
             document.getElementById('btn-export').style.display = 'block';
+            if(document.getElementById('btn-export-global')) document.getElementById('btn-export-global').style.display = 'none';
+            document.getElementById('badge-posts').style.display = 'block';
+            document.getElementById('badge-comments').style.display = 'block';
+            document.getElementById('sentiment-badge-label').innerText = 'Sentiment Post';
             applyFilters();
         } else {
             mainView.style.display = 'none';
@@ -489,6 +494,10 @@
             filterTopics.style.display = 'none'; 
             filterLabels.style.display = 'none';
             document.getElementById('btn-export').style.display = 'none';
+            if(document.getElementById('btn-export-global')) document.getElementById('btn-export-global').style.display = 'block';
+            document.getElementById('badge-posts').style.display = 'none';
+            document.getElementById('badge-comments').style.display = 'none';
+            document.getElementById('sentiment-badge-label').innerText = 'Sentiment Globale';
             
             applyFilters();
             renderGlobalChannelsTable();
@@ -1262,6 +1271,49 @@
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
         const now = new Date();
         const filename = `dati_dashboard_post_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.json`;
+        const dlAnchorElem = document.createElement('a');
+        dlAnchorElem.setAttribute("href", dataStr);
+        dlAnchorElem.setAttribute("download", filename);
+        dlAnchorElem.click();
+    }
+
+    function exportGlobalJson() {
+        if (filteredAllComments.length === 0) return alert("Nessun commento da esportare.");
+        const isAnon = document.getElementById('toggle-anon').checked;
+
+        let topicRegexes = {};
+        Object.keys(topicDB).forEach(t => {
+            let kwList = topicDB[t].map(kw => {
+                let k = kw.trim();
+                if(!k) return null;
+                return k.endsWith('*') ? '\\b' + escapeRegExp(k.slice(0, -1)) + '[a-zA-ZÀ-ÿ0-9]*' : '\\b' + escapeRegExp(k) + '\\b';
+            }).filter(k => k);
+            if(kwList.length > 0) topicRegexes[t] = new RegExp(kwList.join('|'), 'gi');
+        });
+
+        const exportPayload = filteredAllComments.map(c => {
+            let text = c.Testo || '';
+            let assignedTopics = [];
+            Object.keys(topicDB).forEach(t => {
+                if(topicRegexes[t] && text.match(topicRegexes[t])) {
+                    assignedTopics.push(t);
+                }
+            });
+
+            return {
+                Data: c.DataFormattata,
+                Canale: c.Canale,
+                Autore: isAnon ? c.AutoreAnonimo : c.AutoreOriginale,
+                Testo: c.Testo,
+                Sentiment: c.Sentiment,
+                Argomenti: assignedTopics.length > 0 ? assignedTopics.join(', ') : 'Nessun argomento',
+                Link: c.Link
+            };
+        });
+
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
+        const now = new Date();
+        const filename = `dati_commenti_globali_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.json`;
         const dlAnchorElem = document.createElement('a');
         dlAnchorElem.setAttribute("href", dataStr);
         dlAnchorElem.setAttribute("download", filename);
