@@ -384,8 +384,8 @@
                 <div id="argomenti-chart-text-details" style="display:none; margin-bottom: 1rem;"></div>
                 
                 <!-- Layout a griglia per i grafici -->
-                <div class="grid-container">
-                    <div style="background:var(--bg-panel); padding:1rem; border-radius:var(--radius-lg); border:1px solid var(--border-color);">
+                <div class="grid-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: stretch;">
+                    <div style="background:var(--bg-panel); padding:1rem; border-radius:var(--radius-lg); border:1px solid var(--border-color); box-shadow:var(--shadow-sm); display:flex; flex-direction:column; justify-content:center;">
                         <canvas id="argomenti-canvas" width="1600" height="1100" style="width: 100%; height: auto;"></canvas>
                         <div style="display:flex; justify-content:center; gap:0.5rem; margin-top:1rem;">
                             <button onclick="downloadChartPng()" class="btn-export" style="background:white; color:var(--brand-blue); border:1px solid var(--brand-blue);">Scarica PNG</button>
