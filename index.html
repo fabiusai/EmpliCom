@@ -1582,6 +1582,11 @@
                     style="background:white;color:var(--brand-blue);border:1px solid var(--brand-blue);">
                     Scarica PNG
                 </button>
+                <button onclick="downloadWordCloudSvg()"
+                    class="btn-export"
+                    style="background:white;color:var(--brand-blue);border:1px solid var(--brand-blue);">
+                    Scarica SVG
+                </button>
             </div>
         </div>
 
@@ -1596,77 +1601,130 @@
     </div>`;
 }
 
+function getTrimmedCanvas(canvas, addWhiteBg) {
+    const ctx = canvas.getContext('2d');
+    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const l = pixels.data.length;
+    let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
+    
+    for (let i = 0; i < l; i += 4) {
+        if (pixels.data[i+3] > 0) { // Cerca pixel non completamente trasparenti
+            let x = (i / 4) % canvas.width;
+            let y = Math.floor((i / 4) / canvas.width);
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+        }
+    }
+    
+    if (minX > maxX) return canvas;
+    
+    const padding = 20;
+    minX = Math.max(0, minX - padding);
+    minY = Math.max(0, minY - padding);
+    maxX = Math.min(canvas.width, maxX + padding);
+    maxY = Math.min(canvas.height, maxY + padding);
+    
+    const width = maxX - minX;
+    const height = maxY - minY;
+    
+    const trimmed = document.createElement('canvas');
+    trimmed.width = width;
+    trimmed.height = height;
+    const tCtx = trimmed.getContext('2d');
+    
+    if (addWhiteBg) {
+        tCtx.fillStyle = "#ffffff";
+        tCtx.fillRect(0, 0, width, height);
+    }
+    
+    tCtx.drawImage(canvas, minX, minY, width, height, 0, 0, width, height);
+    return trimmed;
+}
+
 function downloadWordCloudPng() {
     const canvas = document.getElementById('wc-canvas');
     if (!canvas) return;
 
-    const exportCanvas = document.createElement('canvas');
-    exportCanvas.width = canvas.width;
-    exportCanvas.height = canvas.height;
-
-    const ctx = exportCanvas.getContext('2d');
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-    ctx.drawImage(canvas, 0, 0);
-
+    const exportCanvas = getTrimmedCanvas(canvas, true);
+    
     const link = document.createElement('a');
     link.download = `TagCloud_${new Date().toISOString().slice(0,10)}.png`;
     link.href = exportCanvas.toDataURL("image/png");
     link.click();
 }
 
-    const stopWords = new Set(["il","lo","la","i","gli","le","un","uno","una","di","a","da","in","con","su","per","tra","fra","e","o","ma","se","che","non","è","sono","ha","hanno","mi","ti","ci","vi","si","ne","al","del","dei","delle","alla","alle","questo","quello","questa","quella","perchè","perché","come","più","anche","ed","ad","ho","hai","abbiamo","avete","sei","siete","era","erano","c'è","sarà","quando","dove","chi","cosa","fare","fatto","molto","poco","tutto","tutti","sempre","mai","solo","poi","già","ancora","ora","qui","lì","così","bene","male","grazie","ciao","buongiorno","buonasera","poste","italiane","piu"]);
+function downloadWordCloudSvg() {
+    const canvas = document.getElementById('wc-canvas');
+    if (!canvas) return;
 
-    function renderWordCloud() {
-        if(!window.WordCloud) return;
-        
-        let wcSel = document.getElementById('wc-filter');
-        if (wcSel && wcSel.options.length <= 1) {
-            let channels = new Set();
-            allCommentsData.forEach(c => { if(c.Canale) channels.add(c.Canale); });
-            let html = '<option value="all">Tutti i canali</option>';
-            Array.from(channels).sort().forEach(c => { html += `<option value="${c}">Solo: ${c}</option>`; });
-            wcSel.innerHTML = html;
-        }
+    const trimmedCanvas = getTrimmedCanvas(canvas, false);
+    
+    let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${trimmedCanvas.width}" height="${trimmedCanvas.height}">
+        <rect width="100%" height="100%" fill="none"/>
+        <image href="${trimmedCanvas.toDataURL('image/png')}" width="100%" height="100%"/>
+    </svg>`;
+    
+    const blob = new Blob([svg], {type: 'image/svg+xml'});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `TagCloud_${new Date().toISOString().slice(0,10)}.svg`;
+    link.click();
+}
 
-        let filterElem = document.getElementById('wc-filter');
-        const filter = filterElem ? filterElem.value : 'all';
-        let freqElem = document.getElementById('wc-min-freq');
-        const minFreq = freqElem ? parseInt(freqElem.value) || 3 : 3;
-        let text = "";
-        
-        // Peschiamo da allCommentsData!
-        filteredAllComments.forEach(c => {
-            if(filter === 'all' || c.Canale === filter) text += " " + c.Testo;
-        });
+const stopWords = new Set(["il","lo","la","i","gli","le","un","uno","una","di","a","da","in","con","su","per","tra","fra","e","o","ma","se","che","non","è","sono","ha","hanno","mi","ti","ci","vi","si","ne","al","del","dei","delle","alla","alle","questo","quello","questa","quella","perchè","perché","come","più","anche","ed","ad","ho","hai","abbiamo","avete","sei","siete","era","erano","c'è","sarà","quando","dove","chi","cosa","fare","fatto","molto","poco","tutto","tutti","sempre","mai","solo","poi","già","ancora","ora","qui","lì","così","bene","male","grazie","ciao","buongiorno","buonasera","poste","italiane","piu"]);
 
-        const words = text.toLowerCase().match(/[a-zàèéìòù]{4,}/g) || [];
-        const counts = {};
-        words.forEach(w => { if(!stopWords.has(w)) counts[w] = (counts[w] || 0) + 1; });
+function renderWordCloud() {
+    if(!window.WordCloud) return;
+    
+    let wcSel = document.getElementById('wc-filter');
+    if (wcSel && wcSel.options.length <= 1) {
+        let channels = new Set();
+        allCommentsData.forEach(c => { if(c.Canale) channels.add(c.Canale); });
+        let html = '<option value="all">Tutti i canali</option>';
+        Array.from(channels).sort().forEach(c => { html += `<option value="${c}">Solo: ${c}</option>`; });
+        wcSel.innerHTML = html;
+    }
 
-        const list = Object.keys(counts).map(w => [w, counts[w]]).filter(item => item[1] >= minFreq).sort((a,b) => b[1] - a[1]).slice(0, 150);
-        const canvas = document.getElementById('wc-canvas');
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let filterElem = document.getElementById('wc-filter');
+    const filter = filterElem ? filterElem.value : 'all';
+    let freqElem = document.getElementById('wc-min-freq');
+    const minFreq = freqElem ? parseInt(freqElem.value) || 3 : 3;
+    let text = "";
+    
+    // Peschiamo da allCommentsData!
+    filteredAllComments.forEach(c => {
+        if(filter === 'all' || c.Canale === filter) text += " " + c.Testo;
+    });
 
-        if(list.length === 0) {
-            ctx.font = "24px 'Nunito Sans', sans-serif"; ctx.fillStyle = "#6b7280"; ctx.textAlign = "center";
-            ctx.fillText("Nessuna parola raggiunge la frequenza minima.", canvas.width/2, canvas.height/2); return;
-        }
+    const words = text.toLowerCase().match(/[a-zàèéìòù]{4,}/g) || [];
+    const counts = {};
+    words.forEach(w => { if(!stopWords.has(w)) counts[w] = (counts[w] || 0) + 1; });
 
-        const maxLog = Math.log(list[0][1] + 1), minLog = Math.log(list[list.length - 1][1] + 1);
-        const listNormalized = list.map(item => {
-            const logNorm = (Math.log(item[1] + 1) - minLog) / (maxLog - minLog || 1);
-            return [item[0], logNorm * 90 + 20];
-        });
-        
-        const colors = ['#0146bc', '#4b73c4', '#8fa9e0', '#002b5c', '#2c529e', '#5a7fc4', '#b3c6ed'];
+    const list = Object.keys(counts).map(w => [w, counts[w]]).filter(item => item[1] >= minFreq).sort((a,b) => b[1] - a[1]).slice(0, 150);
+    const canvas = document.getElementById('wc-canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        WordCloud(canvas, {
+    if(list.length === 0) {
+        ctx.font = "24px 'Nunito Sans', sans-serif"; ctx.fillStyle = "#6b7280"; ctx.textAlign = "center";
+        ctx.fillText("Nessuna parola raggiunge la frequenza minima.", canvas.width/2, canvas.height/2); return;
+    }
+
+    const maxLog = Math.log(list[0][1] + 1), minLog = Math.log(list[list.length - 1][1] + 1);
+    const listNormalized = list.map(item => {
+        const logNorm = (Math.log(item[1] + 1) - minLog) / (maxLog - minLog || 1);
+        return [item[0], logNorm * 90 + 20];
+    });
+    
+    const colors = ['#0146bc', '#4b73c4', '#8fa9e0', '#002b5c', '#2c529e', '#5a7fc4', '#b3c6ed'];
+
+    WordCloud(canvas, {
             list: listNormalized, fontFamily: "'Arial Black', 'Impact', sans-serif", weightFactor: 1,
             shape: 'circle', ellipticity: 1, origin: [canvas.width / 2, canvas.height / 2], gridSize: 3,
             color: function () { return colors[Math.floor(Math.random() * colors.length)]; },
-            rotateRatio: 0, backgroundColor: '#ffffff', drawOutOfBound: false, shrinkToFit: true, minRotation: 0, maxRotation: 0
+            rotateRatio: 0, backgroundColor: 'transparent', drawOutOfBound: false, shrinkToFit: true, minRotation: 0, maxRotation: 0
         });
     }
 </script>
