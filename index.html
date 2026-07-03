@@ -245,6 +245,9 @@
                 <div class="stat-badge" id="badge-comments" style="display: none;">Commenti (in Post): <span id="stat-comments">0</span></div>
                 <button class="btn-export" id="btn-export" style="display: none;" onclick="exportMainJson()">Esporta JSON Post</button>
                 <button class="btn-export" id="btn-export-global" style="display: none;" onclick="exportGlobalJson()">Esporta JSON Commenti</button>
+                <div style="border-left: 1px solid var(--border-color); height: 24px; margin: 0 0.5rem;"></div>
+                <button class="btn-export" style="background-color: var(--brand-yellow); color: var(--brand-blue);" onclick="showUploadOverlay()">Aggiorna Dati</button>
+                <button class="btn-export" style="background-color: #ef4444;" onclick="resetApp()">Reset</button>
             </div>
         </div>
         <div class="topbar-tabs" id="app-tabs">
@@ -254,16 +257,29 @@
     </header>
 
     <div id="upload-overlay">
-        <div class="dropzone" id="dropzone">
+        <div class="dropzone" id="dropzone" style="position: relative;">
+            <button id="close-upload-btn" onclick="hideUploadOverlay()" style="display:none; position:absolute; top:1rem; right:1.5rem; background:transparent; font-size:2rem; color:var(--text-muted); cursor:pointer;">×</button>
             <div class="upload-icon">📁</div>
-            <p>Trascina qui i file per iniziare</p>
+            <p>Trascina qui i file (o clicca)</p>
             <div style="font-size: 0.9em; color: var(--text-muted); margin-top: 8px; line-height: 1.5;">
-                • <b>2 file</b> CSV/XLSX di Emplifi (Post + Commenti)<br>
-                • <b>oppure 1 file</b> JSON (Export precedente)
+                Puoi caricare singolarmente o insieme:<br>
+                • File <b>Post</b> (CSV/XLSX)<br>
+                • File <b>Commenti</b> (CSV/XLSX)<br>
+                • File <b>DB Argomenti</b> (JSON)
             </div>
+            
+            <div style="display:flex; justify-content:center; flex-wrap:wrap; gap:1rem; margin-top:1.5rem;">
+                <div id="status-post" style="padding:0.5rem 1rem; border-radius:var(--radius-md); background:#fee2e2; color:#b91c1c; font-size:0.85rem; font-weight:600;">❌ Post</div>
+                <div id="status-comments" style="padding:0.5rem 1rem; border-radius:var(--radius-md); background:#fee2e2; color:#b91c1c; font-size:0.85rem; font-weight:600;">❌ Commenti</div>
+                <div id="status-db" style="padding:0.5rem 1rem; border-radius:var(--radius-md); background:#f3f4f6; color:#4b5563; font-size:0.85rem; font-weight:600;">⚪ DB Argomenti (Opz.)</div>
+            </div>
+
             <input type="file" id="file-input" multiple accept=".csv, .xls, .xlsx, .json" style="display: none;">
-            <button class="dropzone-btn" onclick="document.getElementById('file-input').click()">Scegli i file</button>
-            <p id="upload-status" style="margin-top: 1rem; font-weight: bold; color: var(--brand-blue);"></p>
+            <div style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: center;">
+                <button class="dropzone-btn" style="margin-top:0;" onclick="document.getElementById('file-input').click()">Scegli file</button>
+                <button class="dropzone-btn" id="btn-process-data" style="margin-top:0; background:var(--pos-color); color:white; display:none;" onclick="runDataProcessing()">Elabora Dashboard</button>
+            </div>
+            <p id="upload-status" style="margin-top: 1rem; font-weight: bold; color: var(--brand-blue); min-height: 20px;"></p>
         </div>
     </div>
 
@@ -516,6 +532,64 @@
     const dropzone = document.getElementById('dropzone');
     const fileInput = document.getElementById('file-input');
     const statusText = document.getElementById('upload-status');
+    let isAppRunning = false;
+
+    function showUploadOverlay() {
+        document.getElementById('upload-overlay').style.display = 'flex';
+        updateUploadBadges();
+        if(isAppRunning) {
+            document.getElementById('close-upload-btn').style.display = 'block';
+            document.getElementById('btn-process-data').innerText = 'Aggiorna Dashboard';
+        } else {
+            document.getElementById('close-upload-btn').style.display = 'none';
+            document.getElementById('btn-process-data').innerText = 'Elabora Dashboard';
+        }
+    }
+
+    function hideUploadOverlay() {
+        document.getElementById('upload-overlay').style.display = 'none';
+    }
+
+    function resetApp() {
+        if(!confirm('Vuoi davvero resettare la dashboard? Tutti i dati non salvati andranno persi.')) return;
+        rawDataPosts = null;
+        rawDataComments = null;
+        topicDB = {};
+        aggregatedData = [];
+        allCommentsData = [];
+        isAppRunning = false;
+        
+        updateUploadBadges();
+        document.getElementById('dashboard-layout').style.display = 'none';
+        document.getElementById('badge-posts').style.display = 'none';
+        document.getElementById('badge-comments').style.display = 'none';
+        document.getElementById('badge-sentiment').style.display = 'none';
+        document.getElementById('btn-export').style.display = 'none';
+        if(document.getElementById('btn-export-global')) document.getElementById('btn-export-global').style.display = 'none';
+        
+        showUploadOverlay();
+        statusText.innerText = '';
+        statusText.style.color = "var(--brand-blue)";
+    }
+
+    function updateUploadBadges() {
+        const sPost = document.getElementById('status-post');
+        const sComm = document.getElementById('status-comments');
+        const sDb = document.getElementById('status-db');
+        const btnProc = document.getElementById('btn-process-data');
+
+        if(rawDataPosts) { sPost.innerHTML = '✅ Post'; sPost.style.background = '#dcfce7'; sPost.style.color = '#166534'; }
+        else { sPost.innerHTML = '❌ Post'; sPost.style.background = '#fee2e2'; sPost.style.color = '#b91c1c'; }
+
+        if(rawDataComments) { sComm.innerHTML = '✅ Commenti'; sComm.style.background = '#dcfce7'; sComm.style.color = '#166534'; }
+        else { sComm.innerHTML = '❌ Commenti'; sComm.style.background = '#fee2e2'; sComm.style.color = '#b91c1c'; }
+
+        if(Object.keys(topicDB).length > 0) { sDb.innerHTML = '✅ DB Argomenti'; sDb.style.background = '#dcfce7'; sDb.style.color = '#166534'; }
+        else { sDb.innerHTML = '⚪ DB Argomenti (Opz.)'; sDb.style.background = '#f3f4f6'; sDb.style.color = '#4b5563'; }
+
+        if(rawDataPosts && rawDataComments) btnProc.style.display = 'block';
+        else btnProc.style.display = 'none';
+    }
 
     dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
     dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
@@ -523,76 +597,88 @@
         e.preventDefault(); dropzone.classList.remove('dragover');
         handleFiles(e.dataTransfer.files);
     });
-    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+    fileInput.addEventListener('change', (e) => { handleFiles(e.target.files); fileInput.value = ''; });
 
     async function handleFiles(files) {
-        if (files.length === 1 && files[0].name.toLowerCase().endsWith('.json')) {
-            statusText.innerText = "⏳ Funzione import JSON precedente da aggiornare per la v2.";
-            return;
-        }
-
-        if (files.length !== 2) {
-            statusText.innerText = "❌ Carica i 2 file Emplifi (Post e Commenti).";
-            statusText.style.color = "var(--neg-color)";
-            return;
-        }
-
-        statusText.innerText = "⏳ Lettura dei file in corso...";
+        if(files.length === 0) return;
+        statusText.innerText = `⏳ Lettura di ${files.length} file in corso...`;
         statusText.style.color = "var(--brand-blue)";
 
-        try {
-            const data1 = await parseAnyFile(files[0]);
-            const data2 = await parseAnyFile(files[1]);
-
-            const identifyFile = (data) => {
-                if (!data || !data[0]) return 'unknown';
-                const keys = Object.keys(data[0]).map(k => k.toLowerCase().trim());
-                if (keys.some(k => k.includes('parent id') || k.includes('sentiment') || k.includes('message content'))) return 'comments';
-                if (keys.some(k => k.includes('content id') || k.includes('platform') || k.includes('labels'))) return 'posts';
-                return 'unknown';
-            };
-
-            const type1 = identifyFile(data1);
-            const type2 = identifyFile(data2);
-
-            if (type1 === 'posts' || type2 === 'comments') {
-                rawDataPosts = data1;
-                rawDataComments = data2;
-            } else if (type2 === 'posts' || type1 === 'comments') {
-                rawDataPosts = data2;
-                rawDataComments = data1;
-            } else {
-                throw new Error("Impossibile riconoscere i file.");
-            }
-
-            statusText.innerText = "⚙️ Elaborazione dati e architettura v2...";
+        const identifyFile = (data) => {
+            if (!data || !data[0]) return 'unknown';
+            const keys = Object.keys(data[0]).map(k => k.toLowerCase().trim());
             
-            setTimeout(() => {
-                try {
-                    processDataV2();
-                    finalizeProcess();
-                } catch (err) {
-                    statusText.innerText = "❌ Errore durante l'elaborazione: " + err.message;
-                    statusText.style.color = "var(--neg-color)";
-                }
-            }, 100);
+            const hasContentId = keys.some(k => k.includes('content id'));
+            const hasParentId = keys.some(k => k.includes('parent id'));
+            const hasMessageContent = keys.some(k => k.includes('message content'));
+            
+            if (hasMessageContent || hasParentId) return 'comments';
+            if (hasContentId) return 'posts';
+            
+            return 'unknown';
+        };
 
-        } catch (error) {
-            statusText.innerText = "❌ Errore: " + error.message;
-            statusText.style.color = "var(--neg-color)";
+        for(let file of files) {
+            try {
+                if(file.name.toLowerCase().endsWith('.json')) {
+                    const text = await file.text();
+                    const imported = JSON.parse(text);
+                    if(Array.isArray(imported) && imported.length > 0 && imported[0].Canale) {
+                        statusText.innerText = "⚠️ Trovato vecchio export JSON: ignorato.";
+                    } else {
+                        topicDB = {};
+                        if(Array.isArray(imported)) {
+                            imported.forEach(item => { if(item && typeof item === 'string') topicDB[item] = [item]; });
+                        } else if(typeof imported === 'object') {
+                            topicDB = imported;
+                        }
+                    }
+                } else {
+                    const data = await parseAnyFile(file);
+                    const type = identifyFile(data);
+                    if(type === 'posts') rawDataPosts = data;
+                    else if(type === 'comments') rawDataComments = data;
+                    else console.warn(`Formato non riconosciuto per: ${file.name}`);
+                }
+            } catch(err) {
+                console.error(err);
+            }
         }
+        
+        updateUploadBadges();
+        statusText.innerText = "✅ File caricati in memoria. Clicca su Elabora / Aggiorna.";
+        statusText.style.color = "var(--pos-color)";
+    }
+
+    function runDataProcessing() {
+        if(!rawDataPosts || !rawDataComments) return;
+        statusText.innerText = "⚙️ Elaborazione dati e architettura v2...";
+        statusText.style.color = "var(--brand-blue)";
+        
+        setTimeout(() => {
+            try {
+                processDataV2();
+                finalizeProcess();
+            } catch (err) {
+                statusText.innerText = "❌ Errore durante l'elaborazione: " + err.message;
+                statusText.style.color = "var(--neg-color)";
+            }
+        }, 100);
     }
 
     function finalizeProcess() {
-        document.getElementById('upload-overlay').style.display = 'none';
+        isAppRunning = true;
+        hideUploadOverlay();
         document.getElementById('dashboard-layout').style.display = 'flex';
-        
-        document.getElementById('badge-posts').style.display = 'block';
-        document.getElementById('badge-comments').style.display = 'block';
         
         initSidebar();
         initTagCloudUI();
-        switchTab('main'); // Forza reset stato visuale
+        
+        if (currentActiveTab === 'main') {
+            switchTab('main'); 
+        } else {
+            switchTab('argomenti');
+        }
     }
 
     // --- PARSING ---
